@@ -59,7 +59,7 @@ import { loadCfOverrides, saveCfOverrides } from "@/store/cashFlowMappingStore";
 import { loadParticipants, type Participant } from "@/store/participantsStore";
 import { loadPWWorksheet } from "@/store/partnershipWorksheetStore";
 import { getEntityLabels, type EntityKind, type EntityLabels } from "@/lib/entityLabels";
-import { buildCapitalStatement, toPublicEntities, type CapitalStatementData, type PublicCapitalEntity } from "@/lib/capitalStatement";
+import { buildCapitalStatement, toPublicEntities, toPublicEntitiesPy, type CapitalStatementData, type PublicCapitalEntity, type PublicCapitalEntityPy } from "@/lib/capitalStatement";
 import "@/styles/workbook.css";
 
 export type { Row, Group };
@@ -997,6 +997,13 @@ function capitalEntities(data: CapitalStatementData, detail: CapDetail): CapEnti
  return [];
 }
 
+// Prior-year entities only exist per-participant for "individual" — there's no class-level PY
+// breakdown computed anywhere (classTotals has no PY counterpart), so "class"/"total" fall back
+// to the totals-only PY line the statement already showed before real per-partner PY data existed.
+function capitalEntitiesPy(data: CapitalStatementData, detail: CapDetail): PublicCapitalEntityPy[] {
+ return detail === "individual" ? toPublicEntitiesPy(data.rowsPy) : [];
+}
+
 // Shared statement header — same serif title block the centre builder and the preview both show,
 // so opening the preview never looks like a different document from what you were just editing.
 function CapitalStatementHeader({ client, title, yearEnd }: { client: string; title: string; yearEnd: string }) {
@@ -1053,17 +1060,16 @@ function CapitalStatementPreview({ data, labels, client, yearEnd, layout, detail
 }) {
  const hasAdj = Math.abs(data.totals.adjustments) > 0.005;
  const ents = capitalEntities(data, detail);
- // There's no participant-level prior-year breakdown anywhere in the system, so the statement
- // is grouped by year — current year shows the Layout/Show breakdown, prior year is always
- // totals-only. The CY summary row reads "Total {year}" when there's a breakdown above it to
- // distinguish it from those rows, or just "{year}" on its own when detail is "total" already.
+ // Real per-participant prior-year rows (detail === "individual" only — see
+ // capitalEntitiesPy's own comment on why "class"/"total" fall back to a totals-only PY line).
+ const entsPy = capitalEntitiesPy(data, detail);
  const cyYear = (yearEnd.match(/\d{4}/) ?? [])[0] ?? "";
  const pyYear = cyYear ? String(Number(cyYear) - 1) : "";
- // PY never shows its own breakdown rows, but its "Total" prefix still follows whether the
- // statement has a breakdown AT ALL (i.e. CY's), so the two year-groups read as a matched pair.
- const totalPrefix = ents.length ? "Total " : "";
- const cyLabel = `${totalPrefix}${cyYear}`;
- const pyLabel = `${totalPrefix}${pyYear}`;
+ // Each year-group's "Total" prefix follows whether THAT year has its own breakdown rows above
+ // it, so a year with no entities (e.g. "class"/"total" detail, or no partners existed yet)
+ // still reads correctly as a standalone total rather than a mislabeled "Total".
+ const cyLabel = `${ents.length ? "Total " : ""}${cyYear}`;
+ const pyLabel = `${entsPy.length ? "Total " : ""}${pyYear}`;
 
  // Opening → Contributions → Drawings → Net income → Closing → Net income (loss) % — matches
  // the column order on a real client's own Statement of Partners' Capital (production sample:
@@ -1076,6 +1082,13 @@ function CapitalStatementPreview({ data, labels, client, yearEnd, layout, detail
  k === "drawings" ? labels.drawings : "Adjustments";
  const rowVal = (o: { opening: number; contributions: number; ni: number; drawings: number; adjustments: number }, k: CapRowKey) =>
  k === "drawings" ? -o.drawings : o[k];
+ // Prior year never tracks adjustments (the worksheet has no PY adjustments field — there's
+ // nothing to reconstruct them from), so its row set is always the CY set minus that one.
+ const rowKeysPy = rowKeys.filter((k): k is Exclude<CapRowKey, "adjustments"> => k !== "adjustments");
+ const rowValPy = (o: { opening: number; contributions: number; ni: number; drawings: number }, k: Exclude<CapRowKey, "adjustments">) =>
+ k === "drawings" ? -o.drawings : o[k];
+ const showVarianceCy = Math.abs(data.varianceCy) >= 0.005;
+ const showVariancePy = Math.abs(data.totalsPy.variance) >= 0.005;
 
  return (
  <div data-tour="wb-capital-preview">
@@ -1110,12 +1123,48 @@ function CapitalStatementPreview({ data, labels, client, yearEnd, layout, detail
  {ents.map(e => <td key={e.name} className="wb-num wb-amt-cy">{e.niPct.toFixed(2)}%</td>)}
  <td className="wb-num wb-amt-cy">{data.totals.niPct.toFixed(2)}%</td>
  </tr>
+ {data.rows.length > 0 && showVarianceCy && (
+ <tr>
+ <td className="wb-preview-mismatch">Variance vs. Balance Sheet {labels.capitalLabel.toLowerCase()}</td>
+ {ents.map(e => <td key={e.name} className="wb-num wb-amt-cy" />)}
+ <td className="wb-num wb-amt-cy wb-preview-mismatch">{formatAmt(data.varianceCy)}</td>
+ </tr>
+ )}
  <tr className="wb-preview-year-row"><td colSpan={ents.length + 2}>{pyYear}</td></tr>
+ {entsPy.length > 0 ? (
+ <>
+ {rowKeysPy.map(k => (
+ <tr key={`py-${k}`}>
+ <td>{rowLabel(k)}</td>
+ {entsPy.map(e => <td key={e.name} className="wb-num wb-amt-py">{e.wasPresent ? formatAmt(rowValPy(e, k)) : "—"}</td>)}
+ <td className="wb-num wb-amt-py">{formatAmt(rowValPy(data.totalsPy, k))}</td>
+ </tr>
+ ))}
+ <tr className="wb-preview-total-row">
+ <td>{pyLabel}</td>
+ {entsPy.map(e => <td key={e.name} className="wb-num wb-amt-py">{e.wasPresent ? formatAmt(e.closing) : "Not yet admitted"}</td>)}
+ <td className="wb-num wb-amt-py">{formatAmt(data.totalsPy.closing)}</td>
+ </tr>
+ <tr>
+ <td>Net income (loss) %</td>
+ {entsPy.map(e => <td key={e.name} className="wb-num wb-amt-py">{e.wasPresent ? `${e.niPct.toFixed(2)}%` : "—"}</td>)}
+ <td className="wb-num wb-amt-py">{data.totalsPy.niPct.toFixed(2)}%</td>
+ </tr>
+ {showVariancePy && (
+ <tr>
+ <td className="wb-preview-mismatch">Variance vs. opening {cyYear}</td>
+ {entsPy.map(e => <td key={e.name} className="wb-num wb-amt-py wb-preview-mismatch">{e.wasPresent && Math.abs(e.variance) >= 0.005 ? formatAmt(e.variance) : "—"}</td>)}
+ <td className="wb-num wb-amt-py wb-preview-mismatch">{formatAmt(data.totalsPy.variance)}</td>
+ </tr>
+ )}
+ </>
+ ) : (
  <tr className="wb-preview-total-row">
  <td>{pyLabel}</td>
  {ents.map(e => <td key={e.name} className="wb-num wb-amt-py">—</td>)}
  <td className="wb-num wb-amt-py">{formatAmt(data.totalsPy.closing)}</td>
  </tr>
+ )}
  </tbody>
  </table>
  </div>
@@ -1154,7 +1203,53 @@ function CapitalStatementPreview({ data, labels, client, yearEnd, layout, detail
  <td className="wb-num wb-amt-cy">{formatAmt(data.totals.closing)}</td>
  <td className="wb-num wb-amt-cy">{data.totals.niPct.toFixed(2)}%</td>
  </tr>
+ {data.rows.length > 0 && showVarianceCy && (
+ <tr>
+ <td className="wb-preview-mismatch">Variance vs. Balance Sheet {labels.capitalLabel.toLowerCase()}</td>
+ <td className="wb-num wb-amt-cy" colSpan={4} />
+ <td className="wb-num wb-amt-cy wb-preview-mismatch">{formatAmt(data.varianceCy)}</td>
+ <td className="wb-num wb-amt-cy" />
+ </tr>
+ )}
  <tr className="wb-preview-year-row"><td colSpan={6}>{pyYear}</td></tr>
+ {entsPy.length > 0 ? (
+ <>
+ {entsPy.map(e => (
+ <tr key={e.name}>
+ <td>{e.name}</td>
+ {e.wasPresent ? (
+ <>
+ <td className="wb-num wb-amt-py">{formatAmt(e.opening)}</td>
+ <td className="wb-num wb-amt-py">{formatAmt(e.contributions)}</td>
+ <td className="wb-num wb-amt-py">{formatAmt(-e.drawings)}</td>
+ <td className="wb-num wb-amt-py">{formatAmt(e.ni)}</td>
+ <td className="wb-num wb-amt-py">{formatAmt(e.closing)}</td>
+ <td className="wb-num wb-amt-py">{e.niPct.toFixed(2)}%</td>
+ </>
+ ) : (
+ <td className="wb-num wb-amt-py" colSpan={6} style={{ color: "var(--wb-text-3)" }}>Not yet admitted</td>
+ )}
+ </tr>
+ ))}
+ <tr className="wb-preview-total-row">
+ <td>{pyLabel}</td>
+ <td className="wb-num wb-amt-py">{formatAmt(data.totalsPy.opening)}</td>
+ <td className="wb-num wb-amt-py">{formatAmt(data.totalsPy.contributions)}</td>
+ <td className="wb-num wb-amt-py">{formatAmt(-data.totalsPy.drawings)}</td>
+ <td className="wb-num wb-amt-py">{formatAmt(data.totalsPy.ni)}</td>
+ <td className="wb-num wb-amt-py">{formatAmt(data.totalsPy.closing)}</td>
+ <td className="wb-num wb-amt-py">{data.totalsPy.niPct.toFixed(2)}%</td>
+ </tr>
+ {showVariancePy && (
+ <tr>
+ <td className="wb-preview-mismatch">Variance vs. opening {cyYear}</td>
+ <td className="wb-num wb-amt-py" colSpan={4} />
+ <td className="wb-num wb-amt-py wb-preview-mismatch">{formatAmt(data.totalsPy.variance)}</td>
+ <td className="wb-num wb-amt-py" />
+ </tr>
+ )}
+ </>
+ ) : (
  <tr className="wb-preview-total-row">
  <td>{pyLabel}</td>
  <td className="wb-num wb-amt-py">{formatAmt(data.totalsPy.opening)}</td>
@@ -1164,14 +1259,9 @@ function CapitalStatementPreview({ data, labels, client, yearEnd, layout, detail
  <td className="wb-num wb-amt-py">{formatAmt(data.totalsPy.closing)}</td>
  <td className="wb-num wb-amt-py">—</td>
  </tr>
+ )}
  </tbody>
  </table>
- )}
- {data.rows.length > 0 && Math.abs(data.totals.closing - data.balanceSheetCapital) >= 0.005 && (
- <div className="wb-preview-row wb-difference">
- <span>Difference vs. Balance Sheet {labels.capitalLabel.toLowerCase()}</span>
- <span className="wb-amt wb-amt-cy" style={{ width: 80, textAlign: "right" }}>{formatAmt(data.totals.closing - data.balanceSheetCapital)}</span>
- </div>
  )}
  <div className="wb-preview-footer">See accompanying notes to financial information</div>
  </div>
@@ -1421,7 +1511,9 @@ export default function Workbook() {
  );
  // Layout/Show now live in the centre panel (not the preview) and control what the preview
  // renders when expanded — the preview itself is left settings-free, matching the centre area.
- const [capLayout, setCapLayout] = useState<CapLayout>("vertical");
+ // Defaults to "horizontal" (partners across, like columns on a real client statement) so the
+ // preview shows individual partner information without the preparer needing to toggle it.
+ const [capLayout, setCapLayout] = useState<CapLayout>("horizontal");
  const [capDetail, setCapDetail] = useState<CapDetail>(() =>
  ((capitalStatement?.rows.length ?? 0) > 12 || engagement.capitalVisibility !== "open") ? "class" : "individual"
  );

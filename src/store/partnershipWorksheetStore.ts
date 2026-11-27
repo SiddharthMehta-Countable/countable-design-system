@@ -43,6 +43,12 @@ export interface PartnerCapitalOverride {
  contributions: number;
  drawings: number;
  adjustments: number;
+ // Prior-year contributions/drawings — independently recorded, same as the current-year fields
+ // above, powering the Statement of Partners' Capital preview's real per-partner PY roll-forward
+ // (P10) instead of a single collapsed totals line. Optional so older stored worksheets (saved
+ // before these existed) still parse; getOverride defaults them to 0.
+ contributionsPy?: number;
+ drawingsPy?: number;
 }
 
 export interface PWWorksheetState {
@@ -69,20 +75,26 @@ const PW_KEY = (engagementId: string) => `cds_pw_worksheet_${engagementId}`;
 // statement's own "Drawings"/"Contributions" lines (sourced from this worksheet, not the TB)
 // show the same numbers — demonstrating both flowing TB → mapping → worksheet → capital
 // statement, not just sitting inert on the TB screen.
+// PY figures below are independently seeded (not derived to force a perfect tie) — same
+// principle as the real B&C Health Partnership statement's own small, unexplained variances —
+// so the Statement of Partners' Capital preview's per-year inline variance check has something
+// genuine to compare against, not a number that trivially always agrees with itself. Priya
+// Nandan has none: she wasn't a partner last year (admitted 2024-07-01).
 const WCP_DRAWINGS_OVERRIDES: PWWorksheetState["overridesByParticipantId"] = {
- "WCP-ALEX": { contributions: 50000, drawings: 120000, adjustments: 0 },
- "WCP-MORGAN": { contributions: 30000, drawings: 75000, adjustments: 0 },
+ "WCP-ALEX": { contributions: 50000, drawings: 120000, adjustments: 0, contributionsPy: 20000, drawingsPy: 60000 },
+ "WCP-MORGAN": { contributions: 30000, drawings: 75000, adjustments: 0, contributionsPy: 10000, drawingsPy: 35000 },
  "WCP-PRIYA": { contributions: 10000, drawings: 15000, adjustments: 0 },
 };
 const BFT_DRAWINGS_OVERRIDES: PWWorksheetState["overridesByParticipantId"] = {
- "BFT-TAYLOR": { contributions: 40000, drawings: 150000, adjustments: 0 },
- "BFT-JORDAN": { contributions: 20000, drawings: 95000, adjustments: 0 },
+ "BFT-TAYLOR": { contributions: 40000, drawings: 150000, adjustments: 0, contributionsPy: 15000, drawingsPy: 50000 },
+ "BFT-JORDAN": { contributions: 20000, drawings: 95000, adjustments: 0, contributionsPy: 8000, drawingsPy: 30000 },
 };
 // B&C Health Partnership's real drawings, straight from the client-provided statement; no
-// contributions that year for either partner (matching the statement's own "-").
+// contributions that year for either partner (matching the statement's own "-"). PY figures are
+// our own invented demo data (the real statement only gave us one year).
 const BCH_DRAWINGS_OVERRIDES: PWWorksheetState["overridesByParticipantId"] = {
- "BCH-ALAN": { contributions: 0, drawings: 325602, adjustments: 0 },
- "BCH-BACCHIOCHI": { contributions: 0, drawings: 350357, adjustments: 0 },
+ "BCH-ALAN": { contributions: 0, drawings: 325602, adjustments: 0, contributionsPy: 0, drawingsPy: 180000 },
+ "BCH-BACCHIOCHI": { contributions: 0, drawings: 350357, adjustments: 0, contributionsPy: 0, drawingsPy: 190000 },
 };
 const SEED_PW_WORKSHEETS: Record<string, PWWorksheetState> = {
  "COM-WCP-Dec312024": { ...blankWorksheetState(), overridesByParticipantId: WCP_DRAWINGS_OVERRIDES },
@@ -107,5 +119,7 @@ export function savePWWorksheet(engagementId: string, state: PWWorksheetState): 
 }
 
 export function getOverride(state: PWWorksheetState, participantId: string): PartnerCapitalOverride {
- return state.overridesByParticipantId[participantId] ?? { contributions: 0, drawings: 0, adjustments: 0 };
+ // Defaults merged in (not just a fallback for a missing id) so a worksheet saved before
+ // contributionsPy/drawingsPy existed still returns a complete, non-optional shape.
+ return { contributions: 0, drawings: 0, adjustments: 0, contributionsPy: 0, drawingsPy: 0, ...state.overridesByParticipantId[participantId] };
 }

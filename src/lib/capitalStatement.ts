@@ -64,6 +64,27 @@ export interface CapitalRow {
  closing: number;
 }
 
+/** One participant's PRIOR year — a real roll-forward, not a collapsed totals line: opening
+ * (independently recorded), contributions/drawings (from the worksheet's own PY overrides), net
+ * income allocated at LAST year's own ownership %, and the closing that roll-forward builds up
+ * to. `trueClosing` is what that closing is independently known to equal — this participant's
+ * own CURRENT-year opening (last year's ending balance IS this year's beginning balance, always,
+ * by definition) — so `variance` is a genuine check, not a number that trivially always agrees
+ * with itself. `wasPresent` is false for a partner admitted during the CURRENT year (no
+ * `priorYearOwnershipValue`): every figure is 0 and the preview shows a note instead of amounts. */
+export interface CapitalRowPy {
+ participant: Participant;
+ wasPresent: boolean;
+ opening: number;
+ contributions: number;
+ niAllocated: number;
+ niPct: number;
+ drawings: number;
+ closing: number;
+ trueClosing: number;
+ variance: number;
+}
+
 export interface CapitalClassTotal {
  key: string;
  label: string;
@@ -89,14 +110,9 @@ export interface ReconciliationRow {
 export interface CapitalStatementData {
  rows: CapitalRow[];
  totals: { opening: number; contributions: number; ni: number; niPct: number; drawings: number; adjustments: number; closing: number };
- // Prior-year totals — real figures from each mapped TB row's own py1 column and the Statement
- // of Income (Loss)'s own prior-year net income, not an invented comparative. There is no
- // participant-level prior-year breakdown anywhere in the system (contributions rows are seeded
- // current-year-only, same as drawings — see buildParticipantScopedRows), so this is TOTALS
- // only: closing is always the current year's own opening (by roll-forward definition — last
- // year's ending balance IS this year's beginning balance), and contributions is 0 (no
- // prior-year contributions data exists).
- totalsPy: { opening: number; contributions: number; ni: number; drawings: number; closing: number };
+ // Real per-participant prior-year roll-forward — see CapitalRowPy's own comment.
+ rowsPy: CapitalRowPy[];
+ totalsPy: { opening: number; contributions: number; ni: number; niPct: number; drawings: number; closing: number; trueClosing: number; variance: number };
  classTotals: CapitalClassTotal[];
  reconciliation: ReconciliationRow[];
  pctTotal: number;
@@ -104,6 +120,11 @@ export interface CapitalStatementData {
  recOK: boolean;
  netIncome: number;
  balanceSheetCapital: number;
+ // This year's own roll-forward closing vs. the independently known Balance Sheet capital —
+ // the same comparison the preview's bottom-of-statement line already made, now also exposed by
+ // name so the preview can show it inline within the current-year section too, matching how
+ // variance (the prior-year equivalent) is shown inline within the prior-year section.
+ varianceCy: number;
 }
 
 const sumField = <T,>(list: T[], f: (r: T) => number) => list.reduce((s, r) => s + f(r), 0);
@@ -182,15 +203,44 @@ export function buildCapitalStatement(
  closing: sumField(rows, r => r.closing),
  };
 
+ // Prior-year net-income weights use LAST year's own ownership % (priorYearOwnershipValue), not
+ // this year's — a partner admitted this year has none (undefined), so defaults to 0 rather than
+ // falling back to their current-year %, correctly giving them no share of a year they weren't a
+ // partner for yet. No pro-ration here: the period-based pro-ration above is for a partial *this*
+ // year, not a historical one we have no admission/retirement dates to pro-rate against.
+ const weightsPy = participants.map(p => p.priorYearOwnershipValue ?? 0);
+ const niAllocationsPy = allocateByWeight(netIncomePy, weightsPy);
+ const niPctsPy = allocateByWeight(100, weightsPy);
+
+ const rowsPy: CapitalRowPy[] = participants.map((p, idx) => {
+ const wasPresent = (p.priorYearOwnershipValue ?? 0) > 0;
+ if (!wasPresent) {
+ return { participant: p, wasPresent, opening: 0, contributions: 0, niAllocated: 0, niPct: 0, drawings: 0, closing: 0, trueClosing: 0, variance: 0 };
+ }
+ const override = getOverride(worksheet, p.id);
+ const opening = p.openingCapitalPy ?? 0;
+ const niAllocated = niAllocationsPy[idx] ?? 0;
+ const contributions = override.contributionsPy ?? 0;
+ const drawings = override.drawingsPy ?? 0;
+ const closing = opening + contributions + niAllocated - drawings;
+ // The one PY figure that's independently KNOWN for certain, not built up from the (separately
+ // recorded, possibly imperfect) PY opening/activity above — this participant's own CURRENT
+ // year opening IS last year's closing, always, by definition of a roll-forward.
+ const trueClosing = p.openingCapital ?? 0;
+ return { participant: p, wasPresent, opening, contributions, niAllocated, niPct: niPctsPy[idx] ?? 0, drawings, closing, trueClosing, variance: closing - trueClosing };
+ });
+
  const totalsPy = {
- opening: rows.reduce((s, r) => s + (tbCapital[r.participant.id]?.openingPy ?? 0), 0),
- contributions: 0,
- ni: netIncomePy,
- drawings: rows.reduce((s, r) => s + (tbCapital[r.participant.id]?.drawingsPy ?? 0), 0),
- // Last year's ending balance IS this year's beginning balance — always, by definition of a
- // roll-forward — so this ties to the worksheet's own current-year opening rather than being
- // computed independently (which could float a cent apart from a separately-summed TB figure).
- closing: totals.opening,
+ opening: sumField(rowsPy, r => r.opening),
+ contributions: sumField(rowsPy, r => r.contributions),
+ ni: sumField(rowsPy, r => r.niAllocated),
+ niPct: sumField(rowsPy, r => r.niPct),
+ drawings: sumField(rowsPy, r => r.drawings),
+ closing: sumField(rowsPy, r => r.closing),
+ // Same "independently known, not built up" logic as each row's own trueClosing — the sum of
+ // everyone's current-year opening, which is exactly this year's own totals.opening.
+ trueClosing: totals.opening,
+ variance: sumField(rowsPy, r => r.variance),
  };
 
  const tbOpeningFor = (list: CapitalRow[]) =>
@@ -198,6 +248,7 @@ export function buildCapitalStatement(
  const balanceSheetCapital = rows.reduce((s, r) => s + (tbCapital[r.participant.id]?.closingFromTB ?? 0), 0);
  const drawingsFromTB = rows.reduce((s, r) => s + (tbCapital[r.participant.id]?.drawingsFromTB ?? 0), 0);
  const contributionsFromTB = rows.reduce((s, r) => s + (tbCapital[r.participant.id]?.contributionsFromTB ?? 0), 0);
+ const varianceCy = totals.closing - balanceSheetCapital;
 
  // Trust/other single-class entities (and a Partnership with no real General/Limited split —
  // see showClassSplit) have no "general"/"limited" split — isGeneral is meaningless there, so
@@ -223,7 +274,7 @@ export function buildCapitalStatement(
 
  const recOK = reconciliation.every(r => r.agrees) && pctOK;
 
- return { rows, totals, totalsPy, classTotals, reconciliation, pctTotal, pctOK, recOK, netIncome, balanceSheetCapital };
+ return { rows, totals, rowsPy, totalsPy, classTotals, reconciliation, pctTotal, pctOK, recOK, netIncome, balanceSheetCapital, varianceCy };
 }
 
 /** A capital row stripped to name + the roll-forward numbers only — never `taxIdentifier`,
@@ -256,5 +307,38 @@ export function toPublicEntities(rows: CapitalRow[]): PublicCapitalEntity[] {
  drawings: r.drawings,
  adjustments: r.adjustments,
  closing: r.closing,
+ }));
+}
+
+/** The prior-year equivalent of `PublicCapitalEntity` — same stripping rationale, plus
+ * `wasPresent`/`trueClosing`/`variance` so a consumer can render "not yet admitted" and the
+ * inline variance check without reaching back into `CapitalRowPy`/`Participant` directly. */
+export interface PublicCapitalEntityPy {
+ id?: string;
+ name: string;
+ wasPresent: boolean;
+ opening: number;
+ contributions: number;
+ ni: number;
+ niPct: number;
+ drawings: number;
+ closing: number;
+ trueClosing: number;
+ variance: number;
+}
+
+export function toPublicEntitiesPy(rows: CapitalRowPy[]): PublicCapitalEntityPy[] {
+ return rows.map(r => ({
+ id: r.participant.id,
+ name: r.participant.name || "Unnamed",
+ wasPresent: r.wasPresent,
+ opening: r.opening,
+ contributions: r.contributions,
+ ni: r.niAllocated,
+ niPct: r.niPct,
+ drawings: r.drawings,
+ closing: r.closing,
+ trueClosing: r.trueClosing,
+ variance: r.variance,
  }));
 }
