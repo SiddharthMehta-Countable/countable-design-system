@@ -64,18 +64,19 @@ export function blankWorksheetState(): PWWorksheetState {
 
 const PW_KEY = (engagementId: string) => `cds_pw_worksheet_${engagementId}`;
 
-// Same mock drawings figures as src/pages/TrialBalance.tsx's MOCK_PARTICIPANT_DRAWINGS, seeded
-// here too so the capital statement's own "Drawings" line (sourced from this worksheet, not the
-// TB) shows the same number — demonstrating drawings flowing TB → mapping → worksheet →
-// capital statement, not just sitting inert on the TB screen.
+// Same mock drawings/contributions figures as src/pages/TrialBalance.tsx's
+// MOCK_PARTICIPANT_DRAWINGS/MOCK_PARTICIPANT_CONTRIBUTIONS, seeded here too so the capital
+// statement's own "Drawings"/"Contributions" lines (sourced from this worksheet, not the TB)
+// show the same numbers — demonstrating both flowing TB → mapping → worksheet → capital
+// statement, not just sitting inert on the TB screen.
 const WCP_DRAWINGS_OVERRIDES: PWWorksheetState["overridesByParticipantId"] = {
- "WCP-ALEX": { contributions: 0, drawings: 120000, adjustments: 0 },
- "WCP-MORGAN": { contributions: 0, drawings: 75000, adjustments: 0 },
- "WCP-PRIYA": { contributions: 0, drawings: 15000, adjustments: 0 },
+ "WCP-ALEX": { contributions: 50000, drawings: 120000, adjustments: 0 },
+ "WCP-MORGAN": { contributions: 30000, drawings: 75000, adjustments: 0 },
+ "WCP-PRIYA": { contributions: 10000, drawings: 15000, adjustments: 0 },
 };
 const BFT_DRAWINGS_OVERRIDES: PWWorksheetState["overridesByParticipantId"] = {
- "BFT-TAYLOR": { contributions: 0, drawings: 150000, adjustments: 0 },
- "BFT-JORDAN": { contributions: 0, drawings: 95000, adjustments: 0 },
+ "BFT-TAYLOR": { contributions: 40000, drawings: 150000, adjustments: 0 },
+ "BFT-JORDAN": { contributions: 20000, drawings: 95000, adjustments: 0 },
 };
 const SEED_PW_WORKSHEETS: Record<string, PWWorksheetState> = {
  "COM-WCP-Dec312024": { ...blankWorksheetState(), overridesByParticipantId: WCP_DRAWINGS_OVERRIDES },

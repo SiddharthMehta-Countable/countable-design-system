@@ -243,6 +243,11 @@ const GIFI_DRAWINGS_MAPNO: Record<PartnerClassKey, string> = {
  limited: "3563.00", // Limited partners' drawings
  trust: "3850.03", // Members distributions
 };
+const GIFI_CONTRIBUTIONS_MAPNO: Record<PartnerClassKey, string> = {
+ general: "3554.00", // General partners contributions during the fiscal period
+ limited: "3564.00", // Limited partners contribution during the fiscal period
+ trust: "3850.04", // Members contributions
+};
 
 // Mock current-year drawings/distributions per participant, keyed by participant id — demo data
 // only, so the flow (TB row → GIFI mapping → participant → capital statement) is actually
@@ -255,6 +260,18 @@ export const MOCK_PARTICIPANT_DRAWINGS: Record<string, number> = {
  "WCP-PRIYA": 15000,
  "BFT-TAYLOR": 150000,
  "BFT-JORDAN": 95000,
+};
+
+// Mock current-year contributions per participant — same demo purpose as
+// MOCK_PARTICIPANT_DRAWINGS above (TB row → GIFI mapping → participant → capital statement),
+// seeded into the worksheet's own overrides in partnershipWorksheetStore.ts so the capital
+// statement's "Contributions" line reflects the same number, not just the TB row.
+export const MOCK_PARTICIPANT_CONTRIBUTIONS: Record<string, number> = {
+ "WCP-ALEX": 50000,
+ "WCP-MORGAN": 30000,
+ "WCP-PRIYA": 10000,
+ "BFT-TAYLOR": 40000,
+ "BFT-JORDAN": 20000,
 };
 
 // Splits `total` across `weights` (not necessarily summing to 100) so every participant's share
@@ -292,6 +309,7 @@ export function buildParticipantScopedRows(entityType: string, participants: Par
  const classKey: PartnerClassKey = entityType === "Trust" ? "trust" : (p.participantClass === "limited" ? "limited" : "general");
  const capitalMapNo = GIFI_CAPITAL_MAPNO[classKey];
  const drawingsMapNo = GIFI_DRAWINGS_MAPNO[classKey];
+ const contributionsMapNo = GIFI_CONTRIBUTIONS_MAPNO[classKey];
  const opening = p.openingCapital ?? 0;
  const closingWithNI = opening + (niShares[i] ?? 0);
  rows.push({
@@ -337,6 +355,29 @@ export function buildParticipantScopedRows(entityType: string, participants: Par
  // Same as the capital row above — left for the auto-mapping suggestion engine to assign.
  } satisfies TBRow);
  }
+
+ const contributions = MOCK_PARTICIPANT_CONTRIBUTIONS[p.id] ?? 0;
+ if (contributions > 0) {
+ rows.push({
+ id: `pco-${p.id}`,
+ accNo: `${contributionsMapNo.split(".")[0]}-${i}`,
+ description: `${nameLabel} Contributions - ${p.name || "Unnamed"}`,
+ original: contributions,
+ adj: 0,
+ final: contributions,
+ py1: 0,
+ changePct: "0.00%",
+ py2: "0.00",
+ mapNo: contributionsMapNo,
+ ls: GIFI_LEADSHEET,
+ grouping: "Equity",
+ subGrouping: "Contributions",
+ cfCategory: "NA",
+ taxCode: "",
+ fxRate: 1.00,
+ // Same as the capital/drawings rows above — left for the auto-mapping suggestion engine to assign.
+ } satisfies TBRow);
+ }
  });
  return rows;
 }
@@ -346,7 +387,7 @@ function getRowFilterCategory(row: TBRow, override?: TBRowOverride): FilterId {
  if (!row.grouping) return "unmapped";
  if (row.autoAssigned && !override?.confirmed) return "autoMapped";
  if (override?.confirmed) return "changeRow";
- if (row.id.startsWith("pc-") || row.id.startsWith("pd-")) return "newRow";
+ if (row.id.startsWith("pc-") || row.id.startsWith("pd-") || row.id.startsWith("pco-")) return "newRow";
  return "addedRow";
 }
 

@@ -92,6 +92,7 @@ export interface BalanceSheetData {
 function participantEquitySection(entityType: string, participants: Participant[]): StatementSection {
  const rows = buildParticipantScopedRows(entityType, participants);
  const capitalRows = rows.filter(r => r.subGrouping === "Partners' capital");
+ const contributionsRows = rows.filter(r => r.subGrouping === "Contributions");
  const drawingsRows = rows.filter(r => r.subGrouping === "Drawings / Distributions");
  const capitalLabel = entityType === "Trust" ? "Beneficiaries' capital" : "Partners' capital";
  const drawingsLabel = entityType === "Trust" ? "Distributions" : "Drawings";
@@ -99,6 +100,9 @@ function participantEquitySection(entityType: string, participants: Participant[
  const lines: StatementLine[] = [];
  if (capitalRows.length > 0) {
  lines.push({ id: "bs-eq-capital", label: capitalLabel, ls: capitalRows[0].ls, mapNo: capitalRows[0].mapNo, cy: sum(capitalRows, r => r.final), py: sum(capitalRows, r => r.py1) });
+ }
+ if (contributionsRows.length > 0) {
+ lines.push({ id: "bs-eq-contributions", label: "Contributions", ls: contributionsRows[0].ls, mapNo: contributionsRows[0].mapNo, cy: sum(contributionsRows, r => r.final), py: sum(contributionsRows, r => r.py1) });
  }
  if (drawingsRows.length > 0) {
  lines.push({ id: "bs-eq-drawings", label: drawingsLabel, ls: drawingsRows[0].ls, mapNo: drawingsRows[0].mapNo, cy: sum(drawingsRows, r => r.final), py: sum(drawingsRows, r => r.py1) });

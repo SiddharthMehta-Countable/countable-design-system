@@ -15,17 +15,19 @@ export interface TBRowOverride {
 
 const TB_MAPPING_KEY = (engagementId: string) => `cds_tb_mapping_${engagementId}`;
 
-// Pre-confirmed participant mapping for the demo capital/drawings rows (see
+// Pre-confirmed participant mapping for the demo capital/drawings/contributions rows (see
 // buildParticipantScopedRows in TrialBalance.tsx — row ids are `pc-{participantId}` /
-// `pd-{participantId}`). Without this, the auto-mapping engine only suggests a participant in
-// the live TB screen's own React state — it's never persisted as "confirmed", so anything that
-// reads the mapping from storage directly (getParticipantCapitalFromTB, used by the Workbook's
-// capital statement) sees no participant linkage at all and the reconciliation shows $0 from TB
-// regardless of what the TB screen displays. Seeding these as already-confirmed is what makes the
-// TB → mapping → capital statement flow demonstrable without a manual confirm click first.
+// `pd-{participantId}` / `pco-{participantId}`). Without this, the auto-mapping engine only
+// suggests a participant in the live TB screen's own React state — it's never persisted as
+// "confirmed", so anything that reads the mapping from storage directly
+// (getParticipantCapitalFromTB, used by the Workbook's capital statement) sees no participant
+// linkage at all and the reconciliation shows $0 from TB regardless of what the TB screen
+// displays. Seeding these as already-confirmed is what makes the TB → mapping → capital
+// statement flow demonstrable without a manual confirm click first.
 const wcpOverrides = (pid: string): Record<string, TBRowOverride> => ({
  [`pc-${pid}`]: { participantId: pid, confirmed: true },
  [`pd-${pid}`]: { participantId: pid, confirmed: true },
+ [`pco-${pid}`]: { participantId: pid, confirmed: true },
 });
 const SEED_TB_MAPPING_OVERRIDES: Record<string, Record<string, TBRowOverride>> = {
  "COM-WCP-Dec312024": { ...wcpOverrides("WCP-ALEX"), ...wcpOverrides("WCP-MORGAN"), ...wcpOverrides("WCP-PRIYA") },

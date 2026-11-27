@@ -85,10 +85,11 @@ export interface CapitalStatementData {
  totals: { opening: number; contributions: number; ni: number; drawings: number; adjustments: number; closing: number };
  // Prior-year totals — real figures from each mapped TB row's own py1 column and the Statement
  // of Income (Loss)'s own prior-year net income, not an invented comparative. There is no
- // participant-level prior-year breakdown anywhere in the system (contributions in particular
- // have no TB row at all, current or prior year), so this is TOTALS only: closing is always the
- // current year's own opening (by roll-forward definition — last year's ending balance IS this
- // year's beginning balance), and contributions is 0 (no prior-year contributions data exists).
+ // participant-level prior-year breakdown anywhere in the system (contributions rows are seeded
+ // current-year-only, same as drawings — see buildParticipantScopedRows), so this is TOTALS
+ // only: closing is always the current year's own opening (by roll-forward definition — last
+ // year's ending balance IS this year's beginning balance), and contributions is 0 (no
+ // prior-year contributions data exists).
  totalsPy: { opening: number; contributions: number; ni: number; drawings: number; closing: number };
  classTotals: CapitalClassTotal[];
  reconciliation: ReconciliationRow[];
@@ -179,6 +180,7 @@ export function buildCapitalStatement(
  list.reduce((s, r) => s + (tbCapital[r.participant.id]?.openingFromTB ?? 0), 0);
  const balanceSheetCapital = rows.reduce((s, r) => s + (tbCapital[r.participant.id]?.closingFromTB ?? 0), 0);
  const drawingsFromTB = rows.reduce((s, r) => s + (tbCapital[r.participant.id]?.drawingsFromTB ?? 0), 0);
+ const contributionsFromTB = rows.reduce((s, r) => s + (tbCapital[r.participant.id]?.contributionsFromTB ?? 0), 0);
 
  // Trust/other single-class entities have no "general"/"limited" split — isGeneral is
  // meaningless there (participantClass is "income", never "general"), so generalRows would be
@@ -195,7 +197,7 @@ export function buildCapitalStatement(
  worksheetVal: sumField(g.list, r => r.opening),
  tbVal: tbOpeningFor(g.list),
  })),
- { label: `${labels.contributions} vs. TB`, worksheetVal: totals.contributions, tbVal: totals.contributions },
+ { label: `${labels.contributions} vs. TB`, worksheetVal: totals.contributions, tbVal: contributionsFromTB },
  { label: `${labels.drawings} vs. TB`, worksheetVal: totals.drawings, tbVal: drawingsFromTB },
  { label: "Net income allocated vs. Statement of Income (Loss)", worksheetVal: totals.ni, tbVal: netIncome },
  { label: `Closing vs. ${labels.capitalLabel} on Balance Sheet`, worksheetVal: totals.closing, tbVal: balanceSheetCapital },
