@@ -47,11 +47,9 @@
   --wb-panel-alt: #f6f8fb;
   --wb-row-hover: #f7f9fc;
 
-  /* Active nav state — production's own navy tint (#0C2D55 @ 10%) + a light border,
-     not a plain color fill. */
-  --wb-active-bg: rgba(12, 45, 85, 0.1);
+  /* Border color measured directly off production (the title-block's own border-bottom, and
+     the preview panel's border) — kept as a token since it's reused in both places. */
   --wb-active-border: rgb(195, 209, 223);
-  --wb-active-text: #0a3057;
 
   /* Header gradient — the same first two stops as --wb-page's sampled colors (y=0 and
      y=55, i.e. the header's own height), so the header flows straight into the page
@@ -216,32 +214,33 @@
 }
 
 /* ---- LHS NAV ----
-   Flat list items (no pill chrome), matching TemplateSidebarMenu.tsx's own nav rows:
-   hover goes to a neutral muted tint, the active row gets the same 10%-opacity
-   Countable Blue tint and text color that component uses for its selected item. */
+   Flat list items (no pill chrome), matching production's own nav rows measured directly:
+   the list container itself is 350px wide with 16px/8px padding and a 12px radius (all
+   already correct above), body text at rgba(0,0,0,.87) — a neutral near-black, not the
+   app's own navy --wb-text — and the active row is a plain neutral-gray fill with no
+   border and no special text color, not a tinted/bordered treatment. */
+.workbook-shell .wb-lhs-panel { border-radius: 12px; }
 .workbook-shell .wb-lhs-inner { padding: 16px 8px; overflow-y: auto; flex: 1; }
 .workbook-shell .wb-nav-item {
   display: block;
   width: 100%;
   text-align: left;
   padding: 6px 8px;
-  color: var(--wb-text);
-  border: 1px solid transparent;
+  color: rgba(0, 0, 0, 0.87);
+  border: none;
   background: transparent;
   border-radius: 8px;
   cursor: pointer;
   margin-bottom: 2px;
   font-size: 16px;
+  font-weight: 400;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .workbook-shell .wb-nav-item:hover { background: var(--wb-row-hover); }
 .workbook-shell .wb-nav-item.wb-active {
-  background: var(--wb-active-bg);
-  border-color: var(--wb-active-border);
-  color: var(--wb-active-text);
-  font-weight: 400;
+  background: rgba(0, 0, 0, 0.06);
 }
 .workbook-shell .wb-nav-group {
   margin-top: 10px;
@@ -251,29 +250,27 @@
   justify-content: space-between;
   font-weight: 600;
   font-size: 14px;
-  color: var(--wb-text);
+  color: rgba(0, 0, 0, 0.87);
 }
 .workbook-shell .wb-nav-subitem {
   display: block;
   width: 100%;
   text-align: left;
   padding: 6px 8px 6px 28px;
-  color: var(--wb-text);
-  border: 1px solid transparent;
+  color: rgba(0, 0, 0, 0.87);
+  border: none;
   background: transparent;
   border-radius: 8px;
   cursor: pointer;
   font-size: 15px;
+  font-weight: 400;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .workbook-shell .wb-nav-subitem:hover { background: var(--wb-row-hover); }
 .workbook-shell .wb-nav-subitem.wb-active {
-  background: var(--wb-active-bg);
-  border-color: var(--wb-active-border);
-  color: var(--wb-active-text);
-  font-weight: 400;
+  background: rgba(0, 0, 0, 0.06);
 }
 
 /* ---- TITLE BLOCK (icons + centered title/subtitle, one row) ----
@@ -297,6 +294,13 @@
   align-items: center;
   gap: 6px;
   flex: 0 0 auto;
+}
+/* The preview panel overlay (z-index 10) sits right over this corner when open, which left
+   its own toggle button unclickable — the only way to close was the drawer's internal X.
+   Raising this above the overlay keeps the one button working for both open and close. */
+.workbook-shell .wb-title-block-right {
+  position: relative;
+  z-index: 20;
 }
 .workbook-shell .wb-title-block-center {
   flex: 1 1 auto;

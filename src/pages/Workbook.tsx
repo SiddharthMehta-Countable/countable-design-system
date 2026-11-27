@@ -17,6 +17,7 @@ import {
  FolderOpen,
  Check,
  X,
+ PanelLeft,
  PanelRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -1325,6 +1326,7 @@ export default function Workbook() {
  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
  const [expandedLines, setExpandedLines] = useState<Set<string>>(new Set());
  const [search, setSearch] = useState("");
+ const [sidebarOpen, setSidebarOpen] = useState(true);
  const [schedules, setSchedules] = useState<ScheduleDef[]>(() => loadSchedules(engId));
 
  // Force light theme on this page for consistent white workbook experience. A MutationObserver
@@ -1486,8 +1488,9 @@ export default function Workbook() {
 
  {/* Three-panel body */}
  <div className="wb-app-main min-h-0">
- {/* LHS nav panel — always visible, matching production's page-title-block exactly:
- it has no menu-toggle icon, just "Collapse All" and "Refresh". */}
+ {/* LHS nav panel — fully hidden (no band) while closed; opened/closed solely via
+ the menu icon in the main toolbar. */}
+ {sidebarOpen && (
  <aside className="wb-panel wb-lhs-panel">
  <nav className="wb-lhs-inner">
  <button
@@ -1520,6 +1523,7 @@ export default function Workbook() {
  ))}
  </nav>
  </aside>
+ )}
 
  {/* Main panel */}
  <section className="wb-panel wb-main-panel">
@@ -1528,6 +1532,14 @@ export default function Workbook() {
  (icons + title live together, not a separate toolbar strip above the title). */}
  <div className="wb-title-block">
  <div className="wb-title-block-left">
+ <button
+ onClick={() => setSidebarOpen(v => !v)}
+ className="wb-icon-btn"
+ aria-label={sidebarOpen ? "Close menu" : "Open menu"}
+ title={sidebarOpen ? "Close menu" : "Open menu"}
+ >
+ <PanelLeft className="h-4 w-4" />
+ </button>
  <button className="wb-icon-btn" aria-label="Collapse All" title="Collapse All">
  <Minimize2 className="h-4 w-4" />
  </button>
