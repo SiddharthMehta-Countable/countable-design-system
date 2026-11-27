@@ -58,8 +58,11 @@ export function getParticipantCapitalFromTB(
  result[p.id] = {
  // Opening ties to the worksheet's own opening capital — only the capital account itself,
  // not a Drawings/Contributions row, which has no balance until the year's activity is
- // recorded (and shouldn't retroactively change what "opening" means).
- openingFromTB: linked.filter(r => r.subGrouping === "Partners' capital").reduce((s, r) => s + r.original, 0),
+ // recorded (and shouldn't retroactively change what "opening" means). Reads `py1`, not
+ // `original`: the capital row's own `original`/`final` are this year's post-closing balance
+ // (opening + net income allocated — see buildParticipantScopedRows), while `py1` is left as
+ // the untouched opening balance, i.e. last year's closing.
+ openingFromTB: linked.filter(r => r.subGrouping === "Partners' capital").reduce((s, r) => s + r.py1, 0),
  closingFromTB: linked.reduce((s, r) => s + r.final, 0),
  drawingsFromTB: -linked.filter(r => r.subGrouping === "Drawings / Distributions").reduce((s, r) => s + r.final, 0),
  openingPy: linked.filter(r => r.subGrouping === "Partners' capital").reduce((s, r) => s + r.py1, 0),

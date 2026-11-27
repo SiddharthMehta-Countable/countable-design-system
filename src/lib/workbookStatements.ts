@@ -3,6 +3,8 @@
 // the two panes can never drift apart — same rule the Financial Statements folder preview
 // should eventually read from too (P10).
 import { GROUPS, LS_META, type Group, type Row } from "@/lib/tbGroups";
+import { buildParticipantScopedRows, type TBRow } from "@/pages/TrialBalance";
+import type { Participant } from "@/store/participantsStore";
 
 export interface StatementLine {
  id: string;
@@ -82,20 +84,69 @@ export interface BalanceSheetData {
  balancesPy: boolean;
 }
 
-export function buildBalanceSheet(): BalanceSheetData {
+// Partnership/Trust have no Common/Preferred shares or Retained Earnings — their equity is
+// entirely the participants' own capital (opening + net income allocated − drawings, the exact
+// figures buildParticipantScopedRows seeds — see TrialBalance.tsx) plus drawings/distributions,
+// aggregated into one line each. Unlike the generic GROUPS-based equity lines above, these rows
+// are already stored in display sign (capital positive, drawings negative), so no sign flip.
+function participantEquitySection(entityType: string, participants: Participant[]): StatementSection {
+ const rows = buildParticipantScopedRows(entityType, participants);
+ const capitalRows = rows.filter(r => r.subGrouping === "Partners' capital");
+ const drawingsRows = rows.filter(r => r.subGrouping === "Drawings / Distributions");
+ const capitalLabel = entityType === "Trust" ? "Beneficiaries' capital" : "Partners' capital";
+ const drawingsLabel = entityType === "Trust" ? "Distributions" : "Drawings";
+ const sum = (list: TBRow[], f: (r: TBRow) => number) => list.reduce((s, r) => s + f(r), 0);
+ const lines: StatementLine[] = [];
+ if (capitalRows.length > 0) {
+ lines.push({ id: "bs-eq-capital", label: capitalLabel, ls: capitalRows[0].ls, mapNo: capitalRows[0].mapNo, cy: sum(capitalRows, r => r.final), py: sum(capitalRows, r => r.py1) });
+ }
+ if (drawingsRows.length > 0) {
+ lines.push({ id: "bs-eq-drawings", label: drawingsLabel, ls: drawingsRows[0].ls, mapNo: drawingsRows[0].mapNo, cy: sum(drawingsRows, r => r.final), py: sum(drawingsRows, r => r.py1) });
+ }
+ return { id: "bs-eq", label: "Equity", lines, cyTotal: lines.reduce((s, l) => s + l.cy, 0), pyTotal: lines.reduce((s, l) => s + l.py, 0) };
+}
+
+export function buildBalanceSheet(entityType?: string, participants?: Participant[]): BalanceSheetData {
  const currentAssets = section("bs-ca", "Current assets", CURRENT_ASSET_LS, 1);
  const longTermAssets = section("bs-lta", "Long-term assets", LONG_TERM_ASSET_LS, 1);
- const totalAssetsCy = currentAssets.cyTotal + longTermAssets.cyTotal;
- const totalAssetsPy = currentAssets.pyTotal + longTermAssets.pyTotal;
+ let totalAssetsCy = currentAssets.cyTotal + longTermAssets.cyTotal;
+ let totalAssetsPy = currentAssets.pyTotal + longTermAssets.pyTotal;
 
  const currentLiabilities = section("bs-cl", "Current liabilities", CURRENT_LIABILITY_LS, -1);
  const longTermLiabilities = section("bs-ltl", "Long-term liabilities", LONG_TERM_LIABILITY_LS, -1);
  const totalLiabilitiesCy = currentLiabilities.cyTotal + longTermLiabilities.cyTotal;
  const totalLiabilitiesPy = currentLiabilities.pyTotal + longTermLiabilities.pyTotal;
 
- const equity = section("bs-eq", "Equity", EQUITY_LS, -1);
+ const equity = entityType && entityType !== "Corporation" && participants && participants.length > 0
+ ? participantEquitySection(entityType, participants)
+ : section("bs-eq", "Equity", EQUITY_LS, -1);
  const totalLiabEquityCy = totalLiabilitiesCy + equity.cyTotal;
  const totalLiabEquityPy = totalLiabilitiesPy + equity.pyTotal;
+
+ // The generic demo TB's asset/liability figures were authored independently of the
+ // participants' own capital — once Equity above reflects the real (and much larger) partner/
+ // beneficiary capital instead of the generic Corporation equity rows, the sheet no longer
+ // balances against that same small generic asset base. Rather than touch the shared base TB
+ // data (which the Trial Balance page, Cash Flow and schedules all read from too), plug the gap
+ // into one already-present, currently-zero long-term asset line that's thematically right for
+ // the entity — "Long-term investments" for a partnership (the partners' capital genuinely
+ // invested long-term), "Assets held in trust" for a trust — so only the Balance Sheet changes,
+ // and it actually ties out.
+ if (entityType && entityType !== "Corporation" && participants && participants.length > 0) {
+ const plugId = entityType === "Trust" ? "g-l" : "g-k";
+ const plugLabel = entityType === "Trust" ? "Assets held in trust" : "Long-term investments";
+ const plugCy = Math.max(totalLiabEquityCy - totalAssetsCy, 0);
+ const plugPy = Math.max(totalLiabEquityPy - totalAssetsPy, 0);
+ const idx = longTermAssets.lines.findIndex(l => l.id === plugId);
+ if (idx >= 0 && (plugCy > 0 || plugPy > 0)) {
+ const line = longTermAssets.lines[idx];
+ longTermAssets.lines[idx] = { ...line, label: plugLabel, cy: line.cy + plugCy, py: line.py + plugPy };
+ longTermAssets.cyTotal += plugCy;
+ longTermAssets.pyTotal += plugPy;
+ totalAssetsCy += plugCy;
+ totalAssetsPy += plugPy;
+ }
+ }
 
  return {
  currentAssets, longTermAssets, totalAssetsCy, totalAssetsPy,

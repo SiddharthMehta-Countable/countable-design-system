@@ -418,7 +418,7 @@ function IncomeStatementCentre({ is, expandedLines, toggleLine, onAddSchedule, s
  );
 }
 
-function IncomeStatementPreview({ is, client, yearEnd }: { is: IncomeStatementData; client: string; yearEnd: string }) {
+function IncomeStatementPreview({ is, client, yearEnd, isPartnershipOrTrust = false }: { is: IncomeStatementData; client: string; yearEnd: string; isPartnershipOrTrust?: boolean }) {
  const row = (l: StatementLine) => (
  <div key={l.id} className="wb-preview-row wb-indent">
  <span>{l.label}</span>
@@ -444,7 +444,7 @@ function IncomeStatementPreview({ is, client, yearEnd }: { is: IncomeStatementDa
  <div>
  <div className="wb-statement-header">
  <h2>{client}</h2>
- <h3>Statement of Income (Loss) and Retained Earnings (Deficit)</h3>
+ <h3>{isPartnershipOrTrust ? "Statement of Income (Loss)" : "Statement of Income (Loss) and Retained Earnings (Deficit)"}</h3>
  <p>For the year ended {yearEnd}</p>
  </div>
  <div className="wb-preview-rule" />
@@ -459,6 +459,11 @@ function IncomeStatementPreview({ is, client, yearEnd }: { is: IncomeStatementDa
  {is.expenses.lines.map(row)}
  {subtotal("Total expenses", is.expenses.cyTotal, is.expenses.pyTotal)}
  {subtotal("Net income (loss)", is.netIncomeCy, is.netIncomePy, true)}
+ {/* Partnership/Trust: net income closes to each partner/beneficiary's own capital account,
+ shown on the Statement of Partners'/Trust Capital — there's no "Retained Earnings"
+ concept here, so that rollforward (and its reconciliation Difference) doesn't apply. */}
+ {!isPartnershipOrTrust && (
+ <>
  {subtotal("Retained earnings (deficit), beginning of year", is.openingRetainedEarningsCy, is.openingRetainedEarningsPy)}
  {subtotal("Retained earnings (deficit), end of year", is.closingRetainedEarningsCy, is.closingRetainedEarningsPy, true)}
  {hasDifference && (
@@ -469,6 +474,8 @@ function IncomeStatementPreview({ is, client, yearEnd }: { is: IncomeStatementDa
  <span className="wb-amt-py" style={{ width: 80, textAlign: "right" }}>{formatAmt(is.differencePy)}</span>
  </span>
  </div>
+ )}
+ </>
  )}
  <div className="wb-preview-footer">See accompanying notes to financial information</div>
  </div>
@@ -1363,7 +1370,18 @@ export default function Workbook() {
  };
  const scheduleByGroupId = useMemo(() => new Map(schedules.map(s => [s.groupId, s] as const)), [schedules]);
 
- const balanceSheet = useMemo(() => buildBalanceSheet(), []);
+ const isPartnershipOrTrust = engagement.entityType === "Partnership" || engagement.entityType === "Trust";
+ const labels = isPartnershipOrTrust ? getEntityLabels(engagement.entityType as EntityKind, engagement.trustVariant) : null;
+ const participants = useMemo<Participant[]>(() => (isPartnershipOrTrust ? loadParticipants(engId) : []), [engId, isPartnershipOrTrust]);
+
+ // Partnership/Trust: the Balance Sheet's own Equity section is the participants' real capital
+ // (same figures as the Statement of Partners'/Trust Capital, via the Trial Balance's own
+ // participant-scoped rows) instead of the generic Common/Preferred shares + Retained Earnings
+ // lines, which don't exist for these entity types.
+ const balanceSheet = useMemo(
+ () => buildBalanceSheet(engagement.entityType, participants),
+ [engagement.entityType, participants]
+ );
  const incomeStatement = useMemo(() => buildIncomeStatement(balanceSheet), [balanceSheet]);
  const [cfOverrides, setCfOverrides] = useState<Record<string, CfCategory>>(() => loadCfOverrides(engId));
  const cashFlow = useMemo(() => buildCashFlow(incomeStatement, cfOverrides), [incomeStatement, cfOverrides]);
@@ -1374,9 +1392,6 @@ export default function Workbook() {
  return next;
  });
 
- const isPartnershipOrTrust = engagement.entityType === "Partnership" || engagement.entityType === "Trust";
- const labels = isPartnershipOrTrust ? getEntityLabels(engagement.entityType as EntityKind, engagement.trustVariant) : null;
- const participants = useMemo<Participant[]>(() => (isPartnershipOrTrust ? loadParticipants(engId) : []), [engId, isPartnershipOrTrust]);
  const pwWorksheet = useMemo(() => loadPWWorksheet(engId), [engId]);
  const capitalStatement = useMemo(
  () => (isPartnershipOrTrust ? buildCapitalStatement(engId, engagement.entityType as EntityKind, participants, pwWorksheet, engagement.trustVariant, incomeStatement.netIncomePy) : null),
@@ -1763,7 +1778,7 @@ export default function Workbook() {
  <BalanceSheetPreview bs={balanceSheet} client={engagement.client} yearEnd={fullDate(engagement.yearEnd)} scheduleByGroupId={scheduleByGroupId} />
  )}
  {active === "income" && (
- <IncomeStatementPreview is={incomeStatement} client={engagement.client} yearEnd={fullDate(engagement.yearEnd)} />
+ <IncomeStatementPreview is={incomeStatement} client={engagement.client} yearEnd={fullDate(engagement.yearEnd)} isPartnershipOrTrust={isPartnershipOrTrust} />
  )}
  {active === "capital-statement" && capitalStatement && labels && (
  <CapitalStatementPreview data={capitalStatement} labels={labels} client={engagement.client} yearEnd={fullDate(engagement.yearEnd)} layout={capLayout} detail={capDetail} />

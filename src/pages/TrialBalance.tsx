@@ -224,9 +224,13 @@ export function computeAdjFromStorage(engId: string): Record<string, number> {
 
 // GIFI map numbers (per the mapping sheet received from Amar, Nov 2026 — Prod_mapping_Nov2026.csv)
 // for the partner/trust capital roll-forward lines. Leadsheet "TT" (Equity) matches every one of
-// these lines in the sheet. Only "capital beginning balance" and "drawings/distributions" are
-// mapped today — Contributions and Net income allocated aren't TB-sourced accounts in this demo
-// (NI is closed into capital via an adjusting entry, which isn't seeded here).
+// these lines in the sheet. "Capital beginning balance" and "drawings/distributions" are mapped;
+// the capital row's own `original`/`final` also carries the year's net income allocation baked
+// in (see allocateNIByOwnership below) — a real post-closing TB already reflects net income
+// closed to capital, the same way Retained Earnings does for a corporation, so representing it
+// any other way here would make the TB disagree with the Statement of Partners' Capital by
+// exactly the net income amount (the gap this used to leave unseeded). `py1` is left untouched
+// as the opening balance only, since last year's closing is this year's opening by definition.
 type PartnerClassKey = "general" | "limited" | "trust";
 const GIFI_LEADSHEET = "TT";
 const GIFI_CAPITAL_MAPNO: Record<PartnerClassKey, string> = {
@@ -253,6 +257,27 @@ export const MOCK_PARTICIPANT_DRAWINGS: Record<string, number> = {
  "BFT-JORDAN": 95000,
 };
 
+// Splits `total` across `weights` (not necessarily summing to 100) so every participant's share
+// is proportional AND the parts sum exactly back to `total` — no silent penny drift from naive
+// per-participant rounding. A deliberate duplicate of capitalStatement.ts's own allocateByWeight
+// (same algorithm) rather than an import: capitalStatement.ts already imports from this file by
+// way of participantCapitalFromTB.ts, and importing back would create a circular dependency.
+function allocateNIByOwnership(total: number, weights: number[]): number[] {
+ const sumWeights = weights.reduce((s, w) => s + w, 0);
+ if (sumWeights <= 0) return weights.map(() => 0);
+ const raw = weights.map(w => (total * w) / sumWeights);
+ const floors = raw.map(r => Math.trunc(r * 100) / 100);
+ let remainder = Math.round((total - floors.reduce((s, f) => s + f, 0)) * 100);
+ const order = raw.map((r, i) => ({ i, frac: r - floors[i] })).sort((a, b) => b.frac - a.frac);
+ const result = [...floors];
+ for (let k = 0; k < order.length && remainder !== 0; k++) {
+ const step = remainder > 0 ? 0.01 : -0.01;
+ result[order[k].i] = Math.round((result[order[k].i] + step) * 100) / 100;
+ remainder += remainder > 0 ? -1 : 1;
+ }
+ return result;
+}
+
 // Partnership/Trust demo seed — one capital account (+ one drawings account, where mocked) per
 // participant so the entity-aware grouping, participant column, GIFI mapping and auto-mapping
 // suggestions are actually demonstrable (the Corporation demo data has no per-partner capital
@@ -261,19 +286,21 @@ export const MOCK_PARTICIPANT_DRAWINGS: Record<string, number> = {
 export function buildParticipantScopedRows(entityType: string, participants: Participant[]): TBRow[] {
  if (entityType === "Corporation" || participants.length === 0) return [];
  const nameLabel = entityType === "Trust" ? "Beneficiary" : "Partner";
+ const niShares = allocateNIByOwnership(netIncome.final, participants.map(p => p.ownershipValue || 0));
  const rows: TBRow[] = [];
  participants.forEach((p, i) => {
  const classKey: PartnerClassKey = entityType === "Trust" ? "trust" : (p.participantClass === "limited" ? "limited" : "general");
  const capitalMapNo = GIFI_CAPITAL_MAPNO[classKey];
  const drawingsMapNo = GIFI_DRAWINGS_MAPNO[classKey];
  const opening = p.openingCapital ?? 0;
+ const closingWithNI = opening + (niShares[i] ?? 0);
  rows.push({
  id: `pc-${p.id}`,
  accNo: `${capitalMapNo.split(".")[0]}-${i}`,
  description: `${nameLabel} Capital - ${p.name || "Unnamed"}`,
- original: opening,
+ original: closingWithNI,
  adj: 0,
- final: opening,
+ final: closingWithNI,
  py1: opening,
  changePct: "0.00%",
  py2: formatNumber(opening),
