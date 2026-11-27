@@ -47,7 +47,7 @@ import {
 import { loadTBMappingOverrides, saveTBMappingOverrides, type TBRowOverride } from "@/store/tbMappingStore";
 import MergeAccounts from "@/pages/MergeAccounts";
 import { GifiMappingTray } from "@/components/GifiMappingTray";
-import { formatGifiLabel } from "@/lib/gifiMapping";
+import { GIFI_MAPPING, formatGifiLabel } from "@/lib/gifiMapping";
 import {
  ChevronDown,
  ChevronLeft,
@@ -249,6 +249,16 @@ const GIFI_CONTRIBUTIONS_MAPNO: Record<PartnerClassKey, string> = {
  trust: "3850.04", // Members contributions
 };
 
+// Tax Code (the GIFI code's own column on this page, for Partnership/Trust) defaults to the
+// same GIFI entry already chosen for Map No. above — both ultimately point at the same real
+// GIFI mapping sheet, so there's no separate figure to invent here, matching how Map No. itself
+// is populated at row creation rather than left for the tray to fill in. Still fully editable
+// via the Tax Code tray afterward, same as every other row.
+function gifiLabelForMapNo(mapNo: string): string {
+ const entry = GIFI_MAPPING.find(e => e.mapNo === mapNo);
+ return entry ? formatGifiLabel(entry) : "";
+}
+
 // Mock current-year drawings/distributions per participant, keyed by participant id — demo data
 // only, so the flow (TB row → GIFI mapping → participant → capital statement) is actually
 // demonstrable end to end instead of every partner always showing $0 drawings. Matching figures
@@ -327,10 +337,11 @@ export function buildParticipantScopedRows(entityType: string, participants: Par
  grouping: "Equity",
  subGrouping: "Partners' capital",
  cfCategory: "NA",
- taxCode: "",
+ taxCode: gifiLabelForMapNo(capitalMapNo),
  fxRate: 1.00,
- // Intentionally left unassigned — the auto-mapping effect below suggests a participant
- // from the description (demonstrating the suggestion engine) rather than pre-wiring it.
+ // participantId intentionally left unassigned here — the auto-mapping effect below
+ // suggests one from the description (demonstrating the suggestion engine) rather than
+ // pre-wiring it.
  } satisfies TBRow);
 
  const drawings = MOCK_PARTICIPANT_DRAWINGS[p.id] ?? 0;
@@ -350,9 +361,10 @@ export function buildParticipantScopedRows(entityType: string, participants: Par
  grouping: "Equity",
  subGrouping: "Drawings / Distributions",
  cfCategory: "NA",
- taxCode: "",
+ taxCode: gifiLabelForMapNo(drawingsMapNo),
  fxRate: 1.00,
- // Same as the capital row above — left for the auto-mapping suggestion engine to assign.
+ // participantId: same as the capital row above — left for the auto-mapping suggestion
+ // engine to assign.
  } satisfies TBRow);
  }
 
@@ -373,9 +385,10 @@ export function buildParticipantScopedRows(entityType: string, participants: Par
  grouping: "Equity",
  subGrouping: "Contributions",
  cfCategory: "NA",
- taxCode: "",
+ taxCode: gifiLabelForMapNo(contributionsMapNo),
  fxRate: 1.00,
- // Same as the capital/drawings rows above — left for the auto-mapping suggestion engine to assign.
+ // participantId: same as the capital/drawings rows above — left for the auto-mapping
+ // suggestion engine to assign.
  } satisfies TBRow);
  }
  });
@@ -541,7 +554,24 @@ export default function TrialBalance() {
  .map(r => ({ accNo: r.accNo, subGrouping: r.subGrouping, participantId: r.participantId }));
 
  const next = withSeedRows.map(row => {
- if (mappingOverrides[row.id]?.confirmed) return row;
+ // Rows seeded just above (pc-/pd-/pco-) didn't exist yet when the "apply confirmed
+ // overrides on mount" effect ran, so a confirmed override for one of them (e.g. the
+ // seeded participant mapping below) was never merged in — leaving the row's own
+ // participantId/taxCode/mapNo stuck unassigned despite being marked confirmed. Apply it
+ // here too, the same way that effect does for rows that already existed at mount.
+ const override = mappingOverrides[row.id];
+ if (override?.confirmed) {
+ changed = true;
+ return {
+ ...row,
+ grouping: override.grouping ?? row.grouping,
+ subGrouping: override.subGrouping ?? row.subGrouping,
+ participantId: override.participantId ?? row.participantId,
+ taxCode: override.taxCode ?? row.taxCode,
+ mapNo: override.mapNo ?? row.mapNo,
+ autoAssigned: false,
+ };
+ }
 
  // Legacy corp-shaped seed rows (Common Stock / Retained Earnings) aren't valid sub
  // groupings for Partnership/Trust — suggest the closest entity-aware analog.
@@ -1258,7 +1288,7 @@ export default function TrialBalance() {
  <button
  type="button"
  onClick={() => setMapTray({ rowId: row.id, mode: "gifi" })}
- className="text-link font-medium hover:underline focus:outline-none h-7 w-44 text-xs truncate text-center mx-auto block"
+ className="text-link font-medium hover:underline focus:outline-none h-7 w-44 truncate text-center mx-auto block"
  title={typeof row.taxCode === "string" ? row.taxCode : undefined}
  >
  {row.taxCode || "Select…"}
