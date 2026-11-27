@@ -35,7 +35,7 @@ import {
  getGroupingOptions,
  getSubGroupingOptions,
  isParticipantScoped,
- getTaxCodeOptions,
+ getTaxCodeSetLabel,
 } from "@/lib/tbGroupings";
 import {
  matchParticipantByName,
@@ -46,6 +46,8 @@ import {
 } from "@/lib/tbMappingSuggestions";
 import { loadTBMappingOverrides, saveTBMappingOverrides, type TBRowOverride } from "@/store/tbMappingStore";
 import MergeAccounts from "@/pages/MergeAccounts";
+import { GifiMappingTray } from "@/components/GifiMappingTray";
+import { formatGifiLabel } from "@/lib/gifiMapping";
 import {
  ChevronDown,
  ChevronLeft,
@@ -331,6 +333,9 @@ export default function TrialBalance() {
  const [adjModalOpen, setAdjModalOpen] = useState(false);
  const [mergeModalOpen, setMergeModalOpen] = useState(false);
  const [selectedAdjRow, setSelectedAdjRow] = useState<{ accNo: string; description: string } | null>(null);
+ // Map No. and Tax Code (Partnership/Trust) both open the same GIFI mapping tray, keyed to
+ // whichever row/field triggered it — picking an entry only ever updates that one row.
+ const [mapTray, setMapTray] = useState<{ rowId: string; mode: "mapNo" | "gifi" } | null>(null);
  const [trialBalanceData, setTrialBalanceData] = useState([...baseTrialBalanceData]);
  const [activeFilters, setActiveFilters] = useState<Set<FilterId>>(new Set());
  const { isCollapsed: isPanelCollapsed, toggle: togglePanel } = useSecondaryPanel();
@@ -418,6 +423,7 @@ export default function TrialBalance() {
  }
  })();
  const participants = engagementId ? loadParticipants(engagementId) : [];
+ const taxCodeSetLabel = getTaxCodeSetLabel(clientEntityType, clientCountry);
 
  const [mappingOverrides, setMappingOverrides] = useState<Record<string, TBRowOverride>>(() =>
  engagementId ? loadTBMappingOverrides(engagementId) : {}
@@ -1067,7 +1073,6 @@ export default function TrialBalance() {
  const subGroupingOptions = getSubGroupingOptions(clientEntityType, row.grouping);
  const participantScoped = isParticipantScoped(row.subGrouping);
  const loanWarning = isPartnerLoanMiswired(row.description, row.grouping);
- const taxCodeOptions = getTaxCodeOptions(clientEntityType, clientCountry);
  return (
  <tr
  key={row.id}
@@ -1114,6 +1119,7 @@ export default function TrialBalance() {
  <td className="px-6 py-2 text-right text-foreground whitespace-nowrap">{row.changePct}</td>
  <td className="px-6 py-2 text-right text-foreground whitespace-nowrap">{row.py2}</td>
  <td className="px-6 py-2 text-right whitespace-nowrap">
+ {clientEntityType === "Corporation" ? (
  <Input
  type="number"
  value={row.mapNo === "" ? "" : row.mapNo}
@@ -1121,6 +1127,16 @@ export default function TrialBalance() {
  className="h-7 w-20 text-xs text-right ml-auto"
  data-tour={`tb-mapno-${row.id}`}
  />
+ ) : (
+ <button
+ type="button"
+ onClick={() => setMapTray({ rowId: row.id, mode: "mapNo" })}
+ className="text-link font-medium hover:underline focus:outline-none ml-auto block"
+ data-tour={`tb-mapno-${row.id}`}
+ >
+ {row.mapNo === "" ? "Select…" : row.mapNo}
+ </button>
+ )}
  </td>
  <td className="px-6 py-2 text-center whitespace-nowrap">
  <span className="text-link font-medium">{row.ls}</span>
@@ -1171,14 +1187,14 @@ export default function TrialBalance() {
  className="h-7 w-20 text-xs text-center mx-auto"
  />
  ) : (
- <Select value={typeof row.taxCode === "string" && row.taxCode ? row.taxCode : ""} onValueChange={v => updateRowMapping(row.id, { taxCode: v })}>
- <SelectTrigger className="h-7 w-44 text-xs"><SelectValue placeholder="Select…" /></SelectTrigger>
- <SelectContent>
- {taxCodeOptions.map(tc => (
- <SelectItem key={tc} value={tc}>{tc}</SelectItem>
- ))}
- </SelectContent>
- </Select>
+ <button
+ type="button"
+ onClick={() => setMapTray({ rowId: row.id, mode: "gifi" })}
+ className="text-link font-medium hover:underline focus:outline-none h-7 w-44 text-xs truncate text-center mx-auto block"
+ title={typeof row.taxCode === "string" ? row.taxCode : undefined}
+ >
+ {row.taxCode || "Select…"}
+ </button>
  )}
  </td>
  <td className="px-6 py-2 text-right text-foreground whitespace-nowrap">{row.fxRate.toFixed(2)}</td>
@@ -1292,8 +1308,33 @@ export default function TrialBalance() {
    clientName={clientName}
    yearEnd={staticEng?.yearEnd ?? "Dec 31, 2024"}
    prefillRow={selectedAdjRow ?? undefined}
+   resolveParticipantName={accNo => {
+     const tbRow = trialBalanceData.find(r => r.accNo === accNo);
+     if (!tbRow?.participantId) return undefined;
+     return participants.find(p => p.id === tbRow.participantId)?.name || undefined;
+   }}
  />
  <MergeAccounts open={mergeModalOpen} onOpenChange={setMergeModalOpen} engagementId={engagementId} />
+ <GifiMappingTray
+   open={!!mapTray}
+   onClose={() => setMapTray(null)}
+   mode={mapTray?.mode ?? "mapNo"}
+   taxCodeSetLabel={taxCodeSetLabel}
+   currentValue={(() => {
+     if (!mapTray) return undefined;
+     const row = trialBalanceData.find(r => r.id === mapTray.rowId);
+     if (!row) return undefined;
+     return mapTray.mode === "mapNo" ? String(row.mapNo) : String(row.taxCode ?? "");
+   })()}
+   onSelect={entry => {
+     if (!mapTray) return;
+     if (mapTray.mode === "mapNo") {
+       updateRowMapping(mapTray.rowId, { mapNo: entry.mapNo });
+     } else {
+       updateRowMapping(mapTray.rowId, { taxCode: formatGifiLabel(entry) });
+     }
+   }}
+ />
  {/* Right Panel */}
  <EngagementRightPanel />
  </div>

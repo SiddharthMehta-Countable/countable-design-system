@@ -43,18 +43,13 @@ export function getSubGroupingOptions(entityType: string, grouping: string): str
  return getGroupingOptions(entityType)[grouping] ?? [];
 }
 
-// Tax code column (P7) — "scaffold the column behaviour even if the code lists are stubbed."
-// Corporation keeps its existing plain numeric GIFI-style value (no change). Partnership/Trust
-// get a code-SET selector; the actual codes are clearly-labelled placeholders, not real T5013 /
-// T3 / 1065 / 1041 box numbers — the real lists are an explicit "stop and ask" item in the spec.
+// Tax code column (P7). Corporation keeps its existing plain numeric GIFI value (no change).
+// Partnership/Trust now pick from the real GIFI mapping sheet (src/lib/gifiMapping.ts, the same
+// one the Map No. column uses) via GifiMappingTray — GIFI is the CRA reporting code for T5013/T3
+// filings too, not just T2, so there's no separate box-number list to source. This label is just
+// for the tray's own title (e.g. "Select a GIFI code — T5013").
 export function getTaxCodeSetLabel(entityType: string, country: string): string {
  if (entityType === "Partnership") return country === "us" ? "1065" : "T5013";
  if (entityType === "Trust") return country === "us" ? "1041" : "T3";
  return "T2/GIFI";
-}
-
-export function getTaxCodeOptions(entityType: string, country: string): string[] {
- const set = getTaxCodeSetLabel(entityType, country);
- if (entityType === "Corporation") return []; // unchanged — plain numeric input, no dropdown
- return [1, 2, 3, 4, 5].map(n => `${set} — Code ${n} (stub)`);
 }

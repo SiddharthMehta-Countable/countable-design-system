@@ -157,7 +157,7 @@ function DescSearch({ value, onChange }: { value: string; onChange: (desc: strin
   );
 }
 
-export function NewAdjEntryModal({ open, onClose, onSave, engId, clientName, yearEnd, prefillRow, prefillLines, prefillMeta }: {
+export function NewAdjEntryModal({ open, onClose, onSave, engId, clientName, yearEnd, prefillRow, prefillLines, prefillMeta, resolveParticipantName }: {
   open: boolean;
   onClose: () => void;
   onSave: (lines: AdjLine[], meta: AdjEntryMeta) => void;
@@ -167,6 +167,10 @@ export function NewAdjEntryModal({ open, onClose, onSave, engId, clientName, yea
   prefillRow?: { accNo: string; description: string };
   prefillLines?: AdjLine[];
   prefillMeta?: AdjEntryMeta;
+  // Partnership/Trust: a line touching a participant-scoped account (partners' capital,
+  // drawings, contributions) carries that partner automatically — surface it here so it's
+  // visible in the entry itself, not just silently applied at save time.
+  resolveParticipantName?: (accNo: string) => string | undefined;
 }) {
   const [entryDate, setEntryDate] = useState(() => prefillMeta?.entryDate ?? parseYearEndToDate(yearEnd));
   const [entryType, setEntryType] = useState(prefillMeta?.entryType ?? "Journal");
@@ -322,6 +326,7 @@ export function NewAdjEntryModal({ open, onClose, onSave, engId, clientName, yea
                   const otherCredit = (totalCredit - (parseFloat(line.credit) || 0)) > 0;
                   const showDebit = !ownCredit && (ownDebit || !otherDebit);
                   const showCredit = !ownDebit && (ownCredit || !otherCredit);
+                  const partnerName = line.accNo ? resolveParticipantName?.(line.accNo) : undefined;
                   return (
                   <tr key={line.id} className="border-b border-border/50">
                     <td className="px-2 py-1.5">
@@ -329,6 +334,9 @@ export function NewAdjEntryModal({ open, onClose, onSave, engId, clientName, yea
                     </td>
                     <td className="px-2 py-1.5">
                       <DescSearch value={line.description} onChange={(d, a) => setLineAccDesc(line.id, a, d)} />
+                      {partnerName && (
+                        <p className="text-[11px] text-muted-foreground mt-0.5 px-0.5">Linked to: {partnerName}</p>
+                      )}
                     </td>
                     <td className="px-2 py-1.5">
                       {!showDebit ? (
