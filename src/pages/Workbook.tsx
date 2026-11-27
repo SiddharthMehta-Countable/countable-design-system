@@ -799,6 +799,12 @@ function CapitalStatementCentre({ data, labels, layout, detail, capitalVisibilit
  <td className="wb-num">{formatAmt(data.totalsPy.contributions)}</td>
  </tr>
  <tr>
+ <td style={{ fontWeight: 500 }}>{labels.drawings}</td>
+ <td colSpan={3} />
+ <td className="wb-num">{formatAmt(-data.totals.drawings)}</td>
+ <td className="wb-num">{formatAmt(-data.totalsPy.drawings)}</td>
+ </tr>
+ <tr>
  <td>
  <button type="button" onClick={onGoToIncome} style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, fontWeight: 500, color: "var(--wb-link)", font: "inherit" }}>
  Net income allocated <span style={{ color: "var(--wb-text-3)", fontWeight: 400 }}>(from Statement of Income (Loss))</span>
@@ -807,12 +813,6 @@ function CapitalStatementCentre({ data, labels, layout, detail, capitalVisibilit
  <td colSpan={3} />
  <td className="wb-num">{formatAmt(data.totals.ni)}</td>
  <td className="wb-num">{formatAmt(data.totalsPy.ni)}</td>
- </tr>
- <tr>
- <td style={{ fontWeight: 500 }}>{labels.drawings}</td>
- <td colSpan={3} />
- <td className="wb-num">{formatAmt(-data.totals.drawings)}</td>
- <td className="wb-num">{formatAmt(-data.totalsPy.drawings)}</td>
  </tr>
  {hasAdj && (
  <tr>
@@ -861,14 +861,14 @@ function CapitalStatementCentre({ data, labels, layout, detail, capitalVisibilit
  <td className="wb-num">{formatAmt(data.totals.contributions)}</td>
  </tr>
  <tr>
- <td>Net income</td>
- {ents.map(e => <td key={e.name} className="wb-num">{formatAmt(e.ni)}</td>)}
- <td className="wb-num">{formatAmt(data.totals.ni)}</td>
- </tr>
- <tr>
  <td>{labels.drawings}</td>
  {ents.map(e => <td key={e.name} className="wb-num">{formatAmt(-e.drawings)}</td>)}
  <td className="wb-num">{formatAmt(-data.totals.drawings)}</td>
+ </tr>
+ <tr>
+ <td>Net income</td>
+ {ents.map(e => <td key={e.name} className="wb-num">{formatAmt(e.ni)}</td>)}
+ <td className="wb-num">{formatAmt(data.totals.ni)}</td>
  </tr>
  {hasAdj && (
  <tr>
@@ -882,6 +882,11 @@ function CapitalStatementCentre({ data, labels, layout, detail, capitalVisibilit
  {ents.map(e => <td key={e.name} className="wb-num">{formatAmt(e.closing)}</td>)}
  <td className="wb-num">{formatAmt(data.totals.closing)}</td>
  </tr>
+ <tr>
+ <td>Net income (loss) %</td>
+ {ents.map(e => <td key={e.name} className="wb-num">{e.niPct.toFixed(2)}%</td>)}
+ <td className="wb-num">{data.totals.niPct.toFixed(2)}%</td>
+ </tr>
  </tbody>
  </table>
  </div>
@@ -893,8 +898,8 @@ function CapitalStatementCentre({ data, labels, layout, detail, capitalVisibilit
  <th className="wb-num">{labels.holders}</th>
  <th className="wb-num">{labels.allocationHeader}</th>
  <th className="wb-num">Opening</th>
- <th className="wb-num">Net income</th>
  <th className="wb-num">{labels.drawings}</th>
+ <th className="wb-num">Net income</th>
  <th className="wb-num">Closing</th>
  </tr>
  </thead>
@@ -905,8 +910,8 @@ function CapitalStatementCentre({ data, labels, layout, detail, capitalVisibilit
  <td className="wb-num">{c.count}</td>
  <td className="wb-num">{c.pctTotal.toFixed(2)}%</td>
  <td className="wb-num">{formatAmt(c.opening)}</td>
- <td className="wb-num">{formatAmt(c.ni)}</td>
  <td className="wb-num">{formatAmt(-c.drawings)}</td>
+ <td className="wb-num">{formatAmt(c.ni)}</td>
  <td className="wb-num">{formatAmt(c.closing)}</td>
  </tr>
  ))}
@@ -915,8 +920,8 @@ function CapitalStatementCentre({ data, labels, layout, detail, capitalVisibilit
  <td className="wb-num">{data.rows.length}</td>
  <td className="wb-num">{data.pctTotal.toFixed(2)}%</td>
  <td className="wb-num">{formatAmt(data.totals.opening)}</td>
- <td className="wb-num">{formatAmt(data.totals.ni)}</td>
  <td className="wb-num">{formatAmt(-data.totals.drawings)}</td>
+ <td className="wb-num">{formatAmt(data.totals.ni)}</td>
  <td className="wb-num">{formatAmt(data.totals.closing)}</td>
  </tr>
  </tbody>
@@ -928,9 +933,10 @@ function CapitalStatementCentre({ data, labels, layout, detail, capitalVisibilit
  <th>{detail === "individual" ? labels.holder : "Total"}</th>
  <th className="wb-num">Opening</th>
  <th className="wb-num">{labels.contributions}</th>
- <th className="wb-num">Net income</th>
  <th className="wb-num">{labels.drawings}</th>
+ <th className="wb-num">Net income</th>
  <th className="wb-num">Closing</th>
+ <th className="wb-num">Net income (loss) %</th>
  </tr>
  </thead>
  <tbody>
@@ -939,18 +945,20 @@ function CapitalStatementCentre({ data, labels, layout, detail, capitalVisibilit
  <td>{e.name}</td>
  <td className="wb-num">{formatAmt(e.opening)}</td>
  <td className="wb-num">{formatAmt(e.contributions)}</td>
- <td className="wb-num">{formatAmt(e.ni)}</td>
  <td className="wb-num">{formatAmt(-e.drawings)}</td>
+ <td className="wb-num">{formatAmt(e.ni)}</td>
  <td className="wb-num">{formatAmt(e.closing)}</td>
+ <td className="wb-num">{e.niPct.toFixed(2)}%</td>
  </tr>
  ))}
  <tr className="wb-total-row">
  <td>Total</td>
  <td className="wb-num">{formatAmt(data.totals.opening)}</td>
  <td className="wb-num">{formatAmt(data.totals.contributions)}</td>
- <td className="wb-num">{formatAmt(data.totals.ni)}</td>
  <td className="wb-num">{formatAmt(-data.totals.drawings)}</td>
+ <td className="wb-num">{formatAmt(data.totals.ni)}</td>
  <td className="wb-num">{formatAmt(data.totals.closing)}</td>
+ <td className="wb-num">{data.totals.niPct.toFixed(2)}%</td>
  </tr>
  </tbody>
  </table>
@@ -984,7 +992,7 @@ function capitalEntities(data: CapitalStatementData, detail: CapDetail): CapEnti
  return toPublicEntities(data.rows);
  }
  if (detail === "class") {
- return data.classTotals.map(c => ({ name: c.label, opening: c.opening, contributions: c.contributions, ni: c.ni, drawings: c.drawings, adjustments: c.adjustments, closing: c.closing }));
+ return data.classTotals.map(c => ({ name: c.label, opening: c.opening, contributions: c.contributions, ni: c.ni, niPct: c.niPct, drawings: c.drawings, adjustments: c.adjustments, closing: c.closing }));
  }
  return [];
 }
@@ -1057,7 +1065,10 @@ function CapitalStatementPreview({ data, labels, client, yearEnd, layout, detail
  const cyLabel = `${totalPrefix}${cyYear}`;
  const pyLabel = `${totalPrefix}${pyYear}`;
 
- const rowKeys: CapRowKey[] = ["opening", "contributions", "ni", "drawings", ...(hasAdj ? ["adjustments" as const] : [])];
+ // Opening → Contributions → Drawings → Net income → Closing → Net income (loss) % — matches
+ // the column order on a real client's own Statement of Partners' Capital (production sample:
+ // B&C Health Partnership), rather than an order we invented independently.
+ const rowKeys: CapRowKey[] = ["opening", "contributions", "drawings", "ni", ...(hasAdj ? ["adjustments" as const] : [])];
  const rowLabel = (k: CapRowKey) =>
  k === "opening" ? "Opening" :
  k === "contributions" ? labels.contributions :
@@ -1094,6 +1105,11 @@ function CapitalStatementPreview({ data, labels, client, yearEnd, layout, detail
  {ents.map(e => <td key={e.name} className="wb-num wb-amt-cy">{formatAmt(e.closing)}</td>)}
  <td className="wb-num wb-amt-cy">{formatAmt(data.totals.closing)}</td>
  </tr>
+ <tr>
+ <td>Net income (loss) %</td>
+ {ents.map(e => <td key={e.name} className="wb-num wb-amt-cy">{e.niPct.toFixed(2)}%</td>)}
+ <td className="wb-num wb-amt-cy">{data.totals.niPct.toFixed(2)}%</td>
+ </tr>
  <tr className="wb-preview-year-row"><td colSpan={ents.length + 2}>{pyYear}</td></tr>
  <tr className="wb-preview-total-row">
  <td>{pyLabel}</td>
@@ -1110,39 +1126,43 @@ function CapitalStatementPreview({ data, labels, client, yearEnd, layout, detail
  <th></th>
  <th className="wb-num">Opening</th>
  <th className="wb-num">{labels.contributions}</th>
- <th className="wb-num">Net income</th>
  <th className="wb-num">{labels.drawings}</th>
+ <th className="wb-num">Net income</th>
  <th className="wb-num">Closing</th>
+ <th className="wb-num">Net income (loss) %</th>
  </tr>
  </thead>
  <tbody>
- <tr className="wb-preview-year-row"><td colSpan={5}>{cyYear}</td></tr>
+ <tr className="wb-preview-year-row"><td colSpan={6}>{cyYear}</td></tr>
  {ents.map(e => (
  <tr key={e.name}>
  <td>{e.name}</td>
  <td className="wb-num wb-amt-cy">{formatAmt(e.opening)}</td>
  <td className="wb-num wb-amt-cy">{formatAmt(e.contributions)}</td>
- <td className="wb-num wb-amt-cy">{formatAmt(e.ni)}</td>
  <td className="wb-num wb-amt-cy">{formatAmt(-e.drawings)}</td>
+ <td className="wb-num wb-amt-cy">{formatAmt(e.ni)}</td>
  <td className="wb-num wb-amt-cy">{formatAmt(e.closing)}</td>
+ <td className="wb-num wb-amt-cy">{e.niPct.toFixed(2)}%</td>
  </tr>
  ))}
  <tr className="wb-preview-total-row">
  <td>{cyLabel}</td>
  <td className="wb-num wb-amt-cy">{formatAmt(data.totals.opening)}</td>
  <td className="wb-num wb-amt-cy">{formatAmt(data.totals.contributions)}</td>
- <td className="wb-num wb-amt-cy">{formatAmt(data.totals.ni)}</td>
  <td className="wb-num wb-amt-cy">{formatAmt(-data.totals.drawings)}</td>
+ <td className="wb-num wb-amt-cy">{formatAmt(data.totals.ni)}</td>
  <td className="wb-num wb-amt-cy">{formatAmt(data.totals.closing)}</td>
+ <td className="wb-num wb-amt-cy">{data.totals.niPct.toFixed(2)}%</td>
  </tr>
- <tr className="wb-preview-year-row"><td colSpan={5}>{pyYear}</td></tr>
+ <tr className="wb-preview-year-row"><td colSpan={6}>{pyYear}</td></tr>
  <tr className="wb-preview-total-row">
  <td>{pyLabel}</td>
  <td className="wb-num wb-amt-py">{formatAmt(data.totalsPy.opening)}</td>
  <td className="wb-num wb-amt-py">{formatAmt(data.totalsPy.contributions)}</td>
- <td className="wb-num wb-amt-py">{formatAmt(data.totalsPy.ni)}</td>
  <td className="wb-num wb-amt-py">{formatAmt(-data.totalsPy.drawings)}</td>
+ <td className="wb-num wb-amt-py">{formatAmt(data.totalsPy.ni)}</td>
  <td className="wb-num wb-amt-py">{formatAmt(data.totalsPy.closing)}</td>
+ <td className="wb-num wb-amt-py">—</td>
  </tr>
  </tbody>
  </table>
@@ -1617,7 +1637,7 @@ export default function Workbook() {
  value={capDetail}
  options={[
  { value: "individual", label: `Each ${labels.holder.toLowerCase()}`, disabled: capitalStatement.rows.length > 12 || engagement.capitalVisibility !== "open" },
- { value: "class", label: labels.hasClassSplit ? "General / limited" : `All ${labels.holders.toLowerCase()}` },
+ { value: "class", label: capitalStatement.classTotals.length > 1 ? "General / limited" : `All ${labels.holders.toLowerCase()}` },
  { value: "total", label: "Totals only" },
  ]}
  onChange={v => setCapDetail(v as CapDetail)}

@@ -19,7 +19,7 @@ import {
  ALLOCATION_BASIS_OPTIONS,
  type PWWorksheetState,
 } from "@/store/partnershipWorksheetStore";
-import { getEntityLabels, type EntityKind } from "@/lib/entityLabels";
+import { getEntityLabels, hasActualClassSplit, type EntityKind } from "@/lib/entityLabels";
 import { buildCapitalStatement } from "@/lib/capitalStatement";
 
 let _pwParticipantUid = 0;
@@ -54,6 +54,9 @@ interface Props {
 export function PartnershipAgreementWorksheet({ engagementId, entityType, trustVariant = "other", clientName }: Props) {
  const labels = getEntityLabels(entityType, trustVariant);
  const [participants, setParticipants] = useState<Participant[]>(() => loadParticipants(engagementId));
+ // Show the General/Limited split only when this engagement's partners actually have one —
+ // not just because the entity type is capable of it (see hasActualClassSplit's own comment).
+ const showClassSplit = hasActualClassSplit(labels, participants);
  const [worksheet, setWorksheet] = useState<PWWorksheetState>(() => loadPWWorksheet(engagementId));
  const [staleDismissed, setStaleDismissed] = useState(false);
  const isStale = !staleDismissed && localStorage.getItem(STALE_KEY(engagementId)) === "true";
@@ -144,7 +147,7 @@ export function PartnershipAgreementWorksheet({ engagementId, entityType, trustV
  window.open(`${import.meta.env.BASE_URL}engagements/${engagementId}/workbook`, "_blank", "noopener,noreferrer");
  };
 
- const gpOptions = participants.filter(p => !labels.hasClassSplit || isGeneral(p));
+ const gpOptions = participants.filter(p => !showClassSplit || isGeneral(p));
 
  return (
  <div className="flex-1 overflow-auto p-6 bg-background flex flex-col gap-5">
@@ -224,7 +227,7 @@ export function PartnershipAgreementWorksheet({ engagementId, entityType, trustV
  </div>
  )}
 
- {labels.hasClassSplit && (
+ {showClassSplit && (
  <YesNoRow
  label="7. Can limited partners carry negative capital balances?"
  value={worksheet.questionnaire.negativeCapitalAllowed}
@@ -249,7 +252,7 @@ export function PartnershipAgreementWorksheet({ engagementId, entityType, trustV
  <tr className="text-left text-muted-foreground border-b border-border">
  <th className="py-1.5 pr-3 font-medium">{labels.holder}</th>
  <th className="py-1.5 pr-3 font-medium">Type</th>
- {labels.hasClassSplit && <th className="py-1.5 pr-3 font-medium">Class</th>}
+ {showClassSplit && <th className="py-1.5 pr-3 font-medium">Class</th>}
  <th className="py-1.5 pr-3 font-medium text-center">Signing</th>
  <th className="py-1.5 pr-3 font-medium text-right">PY %</th>
  <th className="py-1.5 pr-3 font-medium text-right">{labels.allocationHeader}</th>
@@ -276,7 +279,7 @@ export function PartnershipAgreementWorksheet({ engagementId, entityType, trustV
  </SelectContent>
  </Select>
  </td>
- {labels.hasClassSplit && (
+ {showClassSplit && (
  <td className="py-1.5 pr-3">
  <Select value={p.participantClass ?? "general"} onValueChange={v => updateParticipant(p.id, { participantClass: v })}>
  <SelectTrigger className="h-8 w-24 text-xs"><SelectValue /></SelectTrigger>
@@ -322,14 +325,14 @@ export function PartnershipAgreementWorksheet({ engagementId, entityType, trustV
  </tr>
  );
  })}
- {labels.hasClassSplit && (
+ {showClassSplit && (
  <>
  <tr className="font-medium"><td colSpan={4}>{labels.classGeneral} ({generalRows.length})</td><td /><td className="text-right">{sumField(generalRows, r => r.participant.ownershipValue)}</td><td /><td /><td /></tr>
  <tr className="font-medium"><td colSpan={4}>{labels.classLimited} ({limitedRows.length})</td><td /><td className="text-right">{sumField(limitedRows, r => r.participant.ownershipValue)}</td><td /><td /><td /></tr>
  </>
  )}
  <tr className="font-semibold border-t-2 border-border">
- <td colSpan={labels.hasClassSplit ? 5 : 4}>Total</td>
+ <td colSpan={showClassSplit ? 5 : 4}>Total</td>
  <td className="text-right">{pctTotal.toFixed(2)}</td>
  <td className="text-right">
  {pctOK ? (
@@ -361,8 +364,8 @@ export function PartnershipAgreementWorksheet({ engagementId, entityType, trustV
  <th className="py-1.5 pr-3 font-medium">{labels.holder}</th>
  <th className="py-1.5 pr-3 font-medium text-right">Opening ($)</th>
  <th className="py-1.5 pr-3 font-medium text-right">{labels.contributions} ($)</th>
- <th className="py-1.5 pr-3 font-medium text-right">Net income allocated ($)</th>
  <th className="py-1.5 pr-3 font-medium text-right">{labels.drawings} ($)</th>
+ <th className="py-1.5 pr-3 font-medium text-right">Net income allocated ($)</th>
  <th className="py-1.5 pr-3 font-medium text-right">Adjustments ($)</th>
  <th className="py-1.5 font-medium text-right">Closing ($)</th>
  </tr>
@@ -380,10 +383,10 @@ export function PartnershipAgreementWorksheet({ engagementId, entityType, trustV
  <td className="py-1.5 pr-3">
  <Input type="number" value={r.override.contributions || ""} onChange={e => updateOverride(r.participant.id, { contributions: Number(e.target.value) || 0 })} className="h-8 w-24 text-xs text-right ml-auto" />
  </td>
- <td className="py-1.5 pr-3 text-right bg-muted/30" data-tour={`pw-ni-${r.participant.id}`}>{fmt(r.niAllocated)}</td>
  <td className="py-1.5 pr-3">
  <Input type="number" value={r.override.drawings || ""} onChange={e => updateOverride(r.participant.id, { drawings: Number(e.target.value) || 0 })} className="h-8 w-24 text-xs text-right ml-auto" />
  </td>
+ <td className="py-1.5 pr-3 text-right bg-muted/30" data-tour={`pw-ni-${r.participant.id}`}>{fmt(r.niAllocated)}</td>
  <td className="py-1.5 pr-3">
  <Input type="number" value={r.override.adjustments || ""} onChange={e => updateOverride(r.participant.id, { adjustments: Number(e.target.value) || 0 })} className="h-8 w-24 text-xs text-right ml-auto" />
  </td>
@@ -394,8 +397,8 @@ export function PartnershipAgreementWorksheet({ engagementId, entityType, trustV
  <td className="py-1.5 pr-3">Total</td>
  <td className="py-1.5 pr-3 text-right">{fmt(totals.opening)}</td>
  <td className="py-1.5 pr-3 text-right">{fmt(totals.contributions)}</td>
- <td className="py-1.5 pr-3 text-right">{fmt(totals.ni)}</td>
  <td className="py-1.5 pr-3 text-right">{fmt(totals.drawings)}</td>
+ <td className="py-1.5 pr-3 text-right">{fmt(totals.ni)}</td>
  <td className="py-1.5 pr-3 text-right">{fmt(totals.adjustments)}</td>
  <td className="py-1.5 text-right">{fmt(totals.closing)}</td>
  </tr>

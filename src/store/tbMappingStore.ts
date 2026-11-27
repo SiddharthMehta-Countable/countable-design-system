@@ -36,6 +36,7 @@ const SEED_TB_MAPPING_OVERRIDES: Record<string, Record<string, TBRowOverride>> =
  "COM-BFT-Dec312024": { ...wcpOverrides("BFT-TAYLOR"), ...wcpOverrides("BFT-JORDAN") },
  "REV-BFT-Dec312024": { ...wcpOverrides("BFT-TAYLOR"), ...wcpOverrides("BFT-JORDAN") },
  "T3-BFT-Dec312024": { ...wcpOverrides("BFT-TAYLOR"), ...wcpOverrides("BFT-JORDAN") },
+ "COM-BCH-Dec312024": { ...wcpOverrides("BCH-ALAN"), ...wcpOverrides("BCH-BACCHIOCHI") },
 };
 
 export function loadTBMappingOverrides(engagementId: string): Record<string, TBRowOverride> {

@@ -4,6 +4,8 @@
 // a rewrite. Unit-trust vs. other-trust distinction isn't captured anywhere in the data model
 // yet (no "trust kind" field), so Trust defaults to the "Other trusts" column of the spec's
 // table; wiring a real unit-trust toggle is P12 scope.
+import type { Participant } from "@/store/participantsStore";
+
 export type EntityKind = "Partnership" | "Trust";
 
 export interface EntityLabels {
@@ -55,4 +57,13 @@ export function getEntityLabels(entityType: EntityKind, trustVariant: "unit" | "
  governingDocument: "Partnership agreement", whoSigns: "General partner",
  allocationHeader: "Profit / loss %", capitalLabel: "Partners' capital",
  };
+}
+
+/** Whether THIS engagement actually has a General/Limited split to show — `labels.hasClassSplit`
+ * alone only says the entity type is capable of one (every Partnership), not that it applies: a
+ * real two-partner partnership with no GP/LP structure at all (e.g. two professional
+ * corporations splitting profit by a plain %, no "Limited partners" concept) would otherwise be
+ * forced through a Class column and a "Limited partners (0)" row that mean nothing to them. */
+export function hasActualClassSplit(labels: EntityLabels, participants: Participant[]): boolean {
+ return labels.hasClassSplit && participants.some(p => p.participantClass === "limited");
 }

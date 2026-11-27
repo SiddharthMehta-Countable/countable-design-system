@@ -71,13 +71,16 @@ function buildCapitalStatementDoc(entities: PublicCapitalEntity[], totals: Capit
  cursorY += 16;
  }
 
- type RowKey = "opening" | "contributions" | "ni" | "drawings" | "adjustments";
+ type RowKey = "opening" | "contributions" | "drawings" | "ni" | "adjustments";
  const hasAdj = Math.abs(totals.adjustments) > 0.005;
+ // Opening → Contributions → Drawings → Net income → Closing → Net income (loss) % — matches
+ // the column order on a real client's own Statement of Partners' Capital (see
+ // CapitalStatementPreview in Workbook.tsx for the same ordering and why).
  const rowDefs: { label: string; key: RowKey }[] = [
  { label: "Balance, beginning of year", key: "opening" },
  { label: labels.contributions, key: "contributions" },
- { label: "Net income allocated", key: "ni" },
  { label: labels.drawings, key: "drawings" },
+ { label: "Net income allocated", key: "ni" },
  ...(hasAdj ? [{ label: "Adjustments", key: "adjustments" as const }] : []),
  ];
  const val = (o: { opening: number; contributions: number; ni: number; drawings: number; adjustments: number }, k: RowKey) =>
@@ -94,7 +97,12 @@ function buildCapitalStatementDoc(entities: PublicCapitalEntity[], totals: Capit
  ...visibleEntities.map(e => fmt(e.closing)),
  fmt(totals.closing),
  ]);
- const totalRowIndex = body.length - 1;
+ body.push([
+ "Net income (loss) %",
+ ...visibleEntities.map(e => `${e.niPct.toFixed(2)}%`),
+ `${totals.niPct.toFixed(2)}%`,
+ ]);
+ const totalRowIndex = body.length - 2;
 
  autoTable(doc, {
  startY: cursorY,

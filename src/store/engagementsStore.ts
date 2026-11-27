@@ -42,6 +42,9 @@ export const SEED_ENGAGEMENTS: EngagementRecord[] = [
  { id: "T5013-WCP-Dec312024", client: "Willow Creek Partners LLP", type: "T5013 (Partnerships)", yearEnd: "Dec 31, 2024", team: "R. Chandra", status: "In Progress", statusVariant: "inProgress", hasRF: false, dateCreated: "Jan 15, 2025 09:00 AM", firstYearAudit: false },
  { id: "REV-BFT-Dec312024", client: "Birchwood Family Trust", type: "Review (REV)", yearEnd: "Dec 31, 2024", team: "R. Chandra", status: "In Progress", statusVariant: "inProgress", hasRF: false, dateCreated: "Jan 15, 2025 09:00 AM", firstYearAudit: false },
  { id: "T3-BFT-Dec312024", client: "Birchwood Family Trust", type: "T3 (Trusts)", yearEnd: "Dec 31, 2024", team: "R. Chandra", status: "In Progress", statusVariant: "inProgress", hasRF: false, dateCreated: "Jan 15, 2025 09:00 AM", firstYearAudit: false },
+ // B&C Health Partnership — two corporate partners, no General/Limited split (see matching
+ // Client entry in clientsData.ts and SEED_PARTICIPANTS in participantsStore.ts).
+ { id: "COM-BCH-Dec312024", client: "B&C Health Partnership", type: "Compilation (COM)", yearEnd: "Dec 31, 2024", team: "R. Chandra", status: "In Progress", statusVariant: "inProgress", hasRF: false, dateCreated: "Jan 15, 2025 09:00 AM", firstYearAudit: false },
 ];
 
 function seedDemoEngagementMeta() {

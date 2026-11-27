@@ -78,6 +78,12 @@ const BFT_DRAWINGS_OVERRIDES: PWWorksheetState["overridesByParticipantId"] = {
  "BFT-TAYLOR": { contributions: 40000, drawings: 150000, adjustments: 0 },
  "BFT-JORDAN": { contributions: 20000, drawings: 95000, adjustments: 0 },
 };
+// B&C Health Partnership's real drawings, straight from the client-provided statement; no
+// contributions that year for either partner (matching the statement's own "-").
+const BCH_DRAWINGS_OVERRIDES: PWWorksheetState["overridesByParticipantId"] = {
+ "BCH-ALAN": { contributions: 0, drawings: 325602, adjustments: 0 },
+ "BCH-BACCHIOCHI": { contributions: 0, drawings: 350357, adjustments: 0 },
+};
 const SEED_PW_WORKSHEETS: Record<string, PWWorksheetState> = {
  "COM-WCP-Dec312024": { ...blankWorksheetState(), overridesByParticipantId: WCP_DRAWINGS_OVERRIDES },
  "REV-WCP-Dec312024": { ...blankWorksheetState(), overridesByParticipantId: WCP_DRAWINGS_OVERRIDES },
@@ -85,6 +91,7 @@ const SEED_PW_WORKSHEETS: Record<string, PWWorksheetState> = {
  "COM-BFT-Dec312024": { ...blankWorksheetState(), overridesByParticipantId: BFT_DRAWINGS_OVERRIDES },
  "REV-BFT-Dec312024": { ...blankWorksheetState(), overridesByParticipantId: BFT_DRAWINGS_OVERRIDES },
  "T3-BFT-Dec312024": { ...blankWorksheetState(), overridesByParticipantId: BFT_DRAWINGS_OVERRIDES },
+ "COM-BCH-Dec312024": { ...blankWorksheetState(), overridesByParticipantId: BCH_DRAWINGS_OVERRIDES },
 };
 
 export function loadPWWorksheet(engagementId: string): PWWorksheetState {

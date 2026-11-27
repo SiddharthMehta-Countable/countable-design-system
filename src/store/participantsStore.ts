@@ -67,6 +67,17 @@ const SEED_PARTICIPANTS: Record<string, Participant[]> = {
  { id: "BFT-TAYLOR", engagementId: "T3-BFT-Dec312024", name: "Taylor Novak", participantType: "individual", participantClass: "income", ownershipMode: "percentage", ownershipValue: 60, priorYearOwnershipValue: 60, signingAuthority: true, openingCapital: 162000, admissionDate: null, retirementDate: null, displayOrder: 0 },
  { id: "BFT-JORDAN", engagementId: "T3-BFT-Dec312024", name: "Jordan Singh", participantType: "individual", participantClass: "income", ownershipMode: "percentage", ownershipValue: 40, priorYearOwnershipValue: 40, signingAuthority: false, openingCapital: 108000, admissionDate: null, retirementDate: null, displayOrder: 1 },
  ],
+ // B&C Health Partnership — modeled on a real client-provided Statement of Partners' Capital.
+ // Both partners are themselves professional corporations (participantType "corporate", not
+ // "individual"), both "general" class with no limited partners at all — there's no General/
+ // Limited structure in this agreement, just a plain profit-sharing %, so hasActualClassSplit
+ // correctly keeps the worksheet's Class column and split rows hidden for this engagement.
+ // Alan Chan's opening capital is positive, Bacchiochi's is a deficit (negative) — both render
+ // fine with nothing in the system flagging or blocking a negative balance.
+ "COM-BCH-Dec312024": [
+ { id: "BCH-ALAN", engagementId: "COM-BCH-Dec312024", name: "Alan Chan Psychology Professional Corporation", participantType: "corporate", participantClass: "general", ownershipMode: "percentage", ownershipValue: 47.19, priorYearOwnershipValue: 47.19, signingAuthority: true, openingCapital: 135547, admissionDate: null, retirementDate: null, displayOrder: 0 },
+ { id: "BCH-BACCHIOCHI", engagementId: "COM-BCH-Dec312024", name: "Bacchiochi Psychology Professional Corporation", participantType: "corporate", participantClass: "general", ownershipMode: "percentage", ownershipValue: 52.81, priorYearOwnershipValue: 52.81, signingAuthority: true, openingCapital: -243150, admissionDate: null, retirementDate: null, displayOrder: 1 },
+ ],
 };
 
 export function loadParticipants(engagementId: string): Participant[] {

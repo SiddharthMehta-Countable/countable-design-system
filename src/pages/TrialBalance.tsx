@@ -270,6 +270,12 @@ export const MOCK_PARTICIPANT_DRAWINGS: Record<string, number> = {
  "WCP-PRIYA": 15000,
  "BFT-TAYLOR": 150000,
  "BFT-JORDAN": 95000,
+ // B&C Health Partnership — real figures from the client-provided statement. No contributions
+ // entry for either partner (deliberately omitted, not just zero) since that statement shows
+ // "-" for Contributions — nothing to seed means no Contributions TB row gets generated at all,
+ // same as how a real partner with no contribution that year has no such account to map.
+ "BCH-ALAN": 325602,
+ "BCH-BACCHIOCHI": 350357,
 };
 
 // Mock current-year contributions per participant — same demo purpose as

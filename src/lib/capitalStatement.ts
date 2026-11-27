@@ -4,7 +4,7 @@
 import type { Participant } from "@/store/participantsStore";
 import { getOverride, type PWWorksheetState } from "@/store/partnershipWorksheetStore";
 import { getParticipantCapitalFromTB, getNetIncomeForEngagement } from "@/lib/participantCapitalFromTB";
-import { getEntityLabels, type EntityKind } from "@/lib/entityLabels";
+import { getEntityLabels, hasActualClassSplit, type EntityKind } from "@/lib/entityLabels";
 import { getEngagementMeta } from "@/store/engagementsStore";
 
 const MS_PER_DAY = 86400000;
@@ -54,6 +54,11 @@ export interface CapitalRow {
  opening: number;
  contributions: number;
  niAllocated: number;
+ // This participant's share of net income, as a % of the total (sums to exactly 100 across all
+ // rows via the same largest-remainder allocation used for the dollar amounts) — shown on the
+ // face of the Statement of Partners' Capital itself, matching real partnership statements
+ // (e.g. "Net income (loss) %"), not just tracked internally for the worksheet's own 100% check.
+ niPct: number;
  drawings: number;
  adjustments: number;
  closing: number;
@@ -67,6 +72,7 @@ export interface CapitalClassTotal {
  opening: number;
  contributions: number;
  ni: number;
+ niPct: number;
  drawings: number;
  adjustments: number;
  closing: number;
@@ -82,7 +88,7 @@ export interface ReconciliationRow {
 
 export interface CapitalStatementData {
  rows: CapitalRow[];
- totals: { opening: number; contributions: number; ni: number; drawings: number; adjustments: number; closing: number };
+ totals: { opening: number; contributions: number; ni: number; niPct: number; drawings: number; adjustments: number; closing: number };
  // Prior-year totals — real figures from each mapped TB row's own py1 column and the Statement
  // of Income (Loss)'s own prior-year net income, not an invented comparative. There is no
  // participant-level prior-year breakdown anywhere in the system (contributions rows are seeded
@@ -126,19 +132,28 @@ export function buildCapitalStatement(
  const periodStart = meta.periodStart ? new Date(meta.periodStart) : null;
  const periodEnd = meta.periodEnd ? new Date(meta.periodEnd) : null;
  const validPeriod = periodStart && periodEnd && !isNaN(periodStart.getTime()) && !isNaN(periodEnd.getTime()) ? { periodStart, periodEnd } : { periodStart: null, periodEnd: null };
- const niAllocations = allocateByWeight(netIncome, participants.map(p => proRatedWeight(p, validPeriod.periodStart, validPeriod.periodEnd)));
+ const weights = participants.map(p => proRatedWeight(p, validPeriod.periodStart, validPeriod.periodEnd));
+ const niAllocations = allocateByWeight(netIncome, weights);
+ // Same allocation (same weights, same largest-remainder rounding) applied to a total of 100
+ // instead of the dollar figure, so the displayed % always matches exactly what each partner's
+ // dollar share actually was — never a separately-rounded number that drifts from the $ column.
+ const niPcts = allocateByWeight(100, weights);
 
  const rows: CapitalRow[] = participants.map((p, idx) => {
  const override = getOverride(worksheet, p.id);
  const opening = p.openingCapital ?? 0;
  const niAllocated = niAllocations[idx] ?? 0;
  const closing = opening + override.contributions + niAllocated + override.adjustments - override.drawings;
- return { participant: p, opening, contributions: override.contributions, niAllocated, drawings: override.drawings, adjustments: override.adjustments, closing };
+ return { participant: p, opening, contributions: override.contributions, niAllocated, niPct: niPcts[idx] ?? 0, drawings: override.drawings, adjustments: override.adjustments, closing };
  });
 
  const isGeneral = (p: Participant) => p.participantClass === "general";
  const generalRows = rows.filter(r => isGeneral(r.participant));
  const limitedRows = rows.filter(r => !isGeneral(r.participant));
+ // labels.hasClassSplit only says this ENTITY TYPE is capable of a General/Limited split —
+ // show it only when this engagement's own partners actually have one (see
+ // hasActualClassSplit's own comment).
+ const showClassSplit = hasActualClassSplit(labels, participants);
 
  const classRowTotal = (key: string, label: string, list: CapitalRow[]): CapitalClassTotal => ({
  key, label,
@@ -147,12 +162,13 @@ export function buildCapitalStatement(
  opening: sumField(list, r => r.opening),
  contributions: sumField(list, r => r.contributions),
  ni: sumField(list, r => r.niAllocated),
+ niPct: sumField(list, r => r.niPct),
  drawings: sumField(list, r => r.drawings),
  adjustments: sumField(list, r => r.adjustments),
  closing: sumField(list, r => r.closing),
  });
 
- const classTotals: CapitalClassTotal[] = labels.hasClassSplit
+ const classTotals: CapitalClassTotal[] = showClassSplit
  ? [classRowTotal("general", labels.classGeneral, generalRows), classRowTotal("limited", labels.classLimited, limitedRows)].filter(c => c.count > 0)
  : [classRowTotal("all", labels.classGeneral, rows)].filter(c => c.count > 0);
 
@@ -160,6 +176,7 @@ export function buildCapitalStatement(
  opening: sumField(rows, r => r.opening),
  contributions: sumField(rows, r => r.contributions),
  ni: sumField(rows, r => r.niAllocated),
+ niPct: sumField(rows, r => r.niPct),
  drawings: sumField(rows, r => r.drawings),
  adjustments: sumField(rows, r => r.adjustments),
  closing: sumField(rows, r => r.closing),
@@ -182,12 +199,13 @@ export function buildCapitalStatement(
  const drawingsFromTB = rows.reduce((s, r) => s + (tbCapital[r.participant.id]?.drawingsFromTB ?? 0), 0);
  const contributionsFromTB = rows.reduce((s, r) => s + (tbCapital[r.participant.id]?.contributionsFromTB ?? 0), 0);
 
- // Trust/other single-class entities have no "general"/"limited" split — isGeneral is
- // meaningless there (participantClass is "income", never "general"), so generalRows would be
- // empty and silently show a trivial 0-vs-0 "agrees". Group by the same all-vs-split logic
- // classTotals above already uses, instead of raw generalRows/limitedRows, so this line always
- // reflects every participant somewhere.
- const openingGroups = labels.hasClassSplit
+ // Trust/other single-class entities (and a Partnership with no real General/Limited split —
+ // see showClassSplit) have no "general"/"limited" split — isGeneral is meaningless there, so
+ // generalRows would be empty and silently show a trivial 0-vs-0 "agrees" AND a spurious
+ // "Opening – limited partners vs. TB" row for partners who have no limited-partner concept at
+ // all. Group by the same all-vs-split logic classTotals above already uses, instead of raw
+ // generalRows/limitedRows, so this line always reflects every participant somewhere.
+ const openingGroups = showClassSplit
  ? [{ label: labels.classGeneral, list: generalRows }, { label: labels.classLimited, list: limitedRows }]
  : [{ label: labels.classGeneral, list: rows }];
 
@@ -221,6 +239,7 @@ export interface PublicCapitalEntity {
  opening: number;
  contributions: number;
  ni: number;
+ niPct: number;
  drawings: number;
  adjustments: number;
  closing: number;
@@ -233,6 +252,7 @@ export function toPublicEntities(rows: CapitalRow[]): PublicCapitalEntity[] {
  opening: r.opening,
  contributions: r.contributions,
  ni: r.niAllocated,
+ niPct: r.niPct,
  drawings: r.drawings,
  adjustments: r.adjustments,
  closing: r.closing,

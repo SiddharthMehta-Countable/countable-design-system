@@ -608,6 +608,32 @@ export const clientsData: Client[] = [
    { id: 'T3-BFT-Dec312024', type: 'T3 (Trusts)', periodEnd: 'Dec 31, 2024', status: 'In Progress', dateCreated: 'Jan 15, 2025 09:00 AM' },
   ],
  },
+ // Modeled on a real client-provided Statement of Partners' Capital (B&C Health Partnership) —
+ // two corporate partners (professional corporations, not individuals) with a plain profit %
+ // split and no General/Limited structure at all, proving hasActualClassSplit's "no split unless
+ // the data actually has one" fix and the corporate participantType end to end.
+ {
+  id: 'DEMO-BCH',
+  entityName: 'B&C Health Partnership',
+  legalEntityName: 'B&C Health Partnership',
+  entityType: 'Partnership',
+  status: 'Accepted',
+  integration: 'none',
+  contactName: 'Alan Chan',
+  contactPerson: 'Alan Chan',
+  engagementPartner: 'R. Chandra',
+  email: 'alan@bchealthpartnership.ca',
+  repository: 'Repository',
+  assignedPartner: 'Cpt',
+  assignedTeam: null,
+  businessPhone: '(905) 555-0147',
+  cellPhone: null,
+  clientCountry: 'ca',
+  industryType: 'Professional Services',
+  engagements: [
+   { id: 'COM-BCH-Dec312024', type: 'Compilation (COM)', periodEnd: 'Dec 31, 2024', status: 'In Progress', dateCreated: 'Jan 15, 2025 09:00 AM' },
+  ],
+ },
 ];
 
 export const CLIENT_GROUPS_KEY = 'cds_client_groups_v1';
