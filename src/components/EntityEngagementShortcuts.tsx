@@ -5,13 +5,17 @@ import { cn } from "@/lib/utils";
 // Quick jump straight into the Partnership/Trust demo engagements' detail view — one per entity
 // type x engagement type, covering Compilation/Review/Tax (see src/data/clientsData.ts's
 // DEMO-WCP/DEMO-BFT clients and the matching rows in src/store/engagementsStore.ts).
-const SHORTCUTS: { entity: "Partnership" | "Trust"; engagementType: "Compilation" | "Review" | "Tax"; engagementId: string }[] = [
+const SHORTCUTS: { entity: "Partnership" | "Trust"; engagementType: "Compilation" | "Review" | "Tax"; engagementId: string; label?: string }[] = [
  { entity: "Partnership", engagementType: "Compilation", engagementId: "COM-WCP-Dec312024" },
  { entity: "Partnership", engagementType: "Review", engagementId: "REV-WCP-Dec312024" },
  { entity: "Partnership", engagementType: "Tax", engagementId: "T5013-WCP-Dec312024" },
  { entity: "Trust", engagementType: "Compilation", engagementId: "COM-BFT-Dec312024" },
  { entity: "Trust", engagementType: "Review", engagementId: "REV-BFT-Dec312024" },
  { entity: "Trust", engagementType: "Tax", engagementId: "T3-BFT-Dec312024" },
+ // B&C Health Partnership (clientsData.ts's DEMO-BCH) — two corporate partners, no General/
+ // Limited split at all, modeled on a real client-provided Statement of Partners' Capital.
+ // Needs its own label: "Partnership · Compilation" is already WCP's shortcut above.
+ { entity: "Partnership", engagementType: "Compilation", engagementId: "COM-BCH-Dec312024", label: "Partnership · No GP/LP split" },
 ];
 
 const ENTITY_VARIANT = { Partnership: "warning", Trust: "feature" } as const;
@@ -27,9 +31,9 @@ export function EntityEngagementShortcuts() {
  type="button"
  onClick={() => navigate(`/engagements/${s.engagementId}`)}
  className={cn(badgeVariants({ variant: ENTITY_VARIANT[s.entity] }), "cursor-pointer hover:brightness-95 transition-all")}
- title={`Open the ${s.entity} ${s.engagementType} demo engagement`}
+ title={`Open the ${s.label ?? `${s.entity} ${s.engagementType}`} demo engagement`}
  >
- {s.entity} · {s.engagementType}
+ {s.label ?? `${s.entity} · ${s.engagementType}`}
  </button>
  ))}
  </div>
