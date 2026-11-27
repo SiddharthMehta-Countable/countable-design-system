@@ -64,8 +64,9 @@
   --wb-border-strong: #d6dbe3;
   --wb-divider: #edf0f5;
 
-  /* Text */
-  --wb-text: #0f172a;
+  /* Text — #132439 is production's own measured color (rgb(19, 36, 57), read directly off its
+     page-title-block and h3.title), not an approximation. */
+  --wb-text: #132439;
   --wb-text-2: #475569;
   --wb-text-3: #64748b;
   --wb-text-muted: #94a3b8;
@@ -92,9 +93,7 @@
   /* Typography — Inter first, matching production's computed font-family (it's already
      loaded app-wide via index.css's own @import). */
   --wb-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
-  /* A rounded, friendly sans — production's printed statements render with this same soft,
-     rounded-terminal look (native ui-rounded on macOS/Safari; Varela Round elsewhere). */
-  --wb-font-preview: ui-rounded, "SF Pro Rounded", "Varela Round", Arial, Helvetica, sans-serif;
+  --wb-font-preview: Arial, Helvetica, sans-serif;
 
   background: var(--wb-page);
   color: var(--wb-text);
@@ -199,6 +198,21 @@
   bottom: var(--wb-pad);
   width: var(--wb-preview-w);
   z-index: 10;
+  /* Production's own preview is a bordered, 12px-radius "page card" with an 8px gutter of its
+     own around the page content below — not just the plain 16px-radius/no-border treatment
+     the LHS and main panels share. */
+  padding: 8px;
+  border: 1px solid var(--wb-active-border);
+  border-radius: 12px;
+  /* Slides in/out from the right like production's own mat-drawer, instead of snapping in and
+     out of existence — stays mounted across the collapse toggle so the transform can animate;
+     switching to a different statement (which does unmount it) skips the animation, matching a
+     drawer that's reopening fresh rather than one being dragged shut. */
+  transition: transform 260ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.workbook-shell .wb-preview-panel.wb-preview-panel-collapsed {
+  transform: translateX(calc(100% + var(--wb-pad) + 24px));
+  pointer-events: none;
 }
 
 /* ---- LHS NAV ----
@@ -271,7 +285,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 24px;
+  padding: 8px 50px;
   border-bottom: 1px solid var(--wb-active-border);
   background: var(--wb-panel);
   flex-shrink: 0;
@@ -302,22 +316,16 @@
   transition: background 140ms ease, color 140ms ease;
 }
 .workbook-shell .wb-icon-btn:hover { background: var(--wb-row-hover); color: var(--wb-text); }
-.workbook-shell .wb-icon-btn.wb-subtle { color: var(--wb-text-3); }
 
 /* ---- MAIN CONTENT + TITLE ---- */
 .workbook-shell .wb-main-content { flex: 1; overflow-y: auto; padding: 20px 28px 36px; }
 .workbook-shell .wb-view-title { text-align: center; }
-.workbook-shell .wb-view-entity {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--wb-text);
-  margin-bottom: 2px;
-}
 .workbook-shell .wb-view-title h1,
 .workbook-shell .wb-view-title h2 {
   margin: 0 0 4px;
   font-size: 24px;
   font-weight: 600;
+  line-height: 1.3;
   letter-spacing: -0.01em;
   color: var(--wb-text);
 }
@@ -441,10 +449,14 @@
 }
 .workbook-shell .wb-ghost-schedule:hover { background: var(--wb-row-hover); color: var(--wb-text); }
 
-/* ---- PREVIEW PANEL ---- */
+/* ---- PREVIEW PANEL ----
+   !important on the font-family here isn't decorative: index.css has a blanket
+   `* { font-family: Inter !important }` (added before this rounded preview font existed)
+   that would otherwise win on specificity ties and silently flatten every statement
+   preview back to the app's own UI font, undoing the whole point of --wb-font-preview. */
 .workbook-shell .wb-preview-inner {
   padding: 24px 28px;
-  font-family: var(--wb-font-preview);
+  font-family: var(--wb-font-preview) !important;
   color: var(--wb-text);
   font-size: 13px;
   position: relative;
@@ -452,6 +464,7 @@
   overflow-x: auto;
   flex: 1;
 }
+.workbook-shell .wb-preview-inner * { font-family: inherit !important; }
 .workbook-shell .wb-preview-close {
   position: absolute;
   top: 12px;
@@ -459,24 +472,30 @@
   border: 1px solid var(--wb-border);
   background: var(--wb-panel);
 }
-/* Left-aligned, like a real printed statement letterhead — not centered on the page. */
+/* Left-aligned, like a real printed statement letterhead — not centered on the page. All
+   three lines (entity name, statement name, date) are the same size and weight in production
+   — there's no visual hierarchy between them here, just tight stacking. */
 .workbook-shell .wb-statement-header { text-align: left; }
 .workbook-shell .wb-statement-header h2,
-.workbook-shell .wb-statement-header h3 { margin: 0; font-weight: 700; }
-.workbook-shell .wb-statement-header h2 { font-size: 20px; }
-.workbook-shell .wb-statement-header h3 { font-size: 17px; }
-.workbook-shell .wb-statement-header p { margin: 4px 0 0; font-size: 13px; color: var(--wb-text-2); }
+.workbook-shell .wb-statement-header h3,
+.workbook-shell .wb-statement-header p {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--wb-text);
+}
 .workbook-shell .wb-preview-rule { border-top: 1px solid var(--wb-text); margin: 8px 0 10px; }
-/* The date-column header row sits on a heavier double rule, not the same thin line used
-   between ordinary rows — it's the one boundary that separates the letterhead from the
-   numbers, so it reads as a stronger break than a subtotal. */
+/* The date-column header row sits on a heavier rule than the thin line used between ordinary
+   rows — it's the one boundary that separates the letterhead from the numbers, so it reads as
+   a stronger break than a subtotal. */
 .workbook-shell .wb-preview-datecols {
   display: flex;
   justify-content: flex-end;
   gap: 24px;
   padding-bottom: 6px;
   margin-bottom: 6px;
-  border-bottom: 3px double var(--wb-text);
+  border-bottom: 2px solid var(--wb-text);
 }
 .workbook-shell .wb-preview-datecols span {
   width: 80px;
@@ -520,11 +539,31 @@
   font-size: 11px;
   text-align: center;
 }
-/* Capital Statement preview tables: never wrap a column's text to fit the fixed 600px
-   panel — let the table run wider than the panel and scroll sideways instead (the
-   overflow-x: auto on .wb-preview-inner is what makes that scrollbar appear). */
-.workbook-shell .wb-preview-inner .wb-data-table th,
-.workbook-shell .wb-preview-inner .wb-data-table td { white-space: nowrap; }
+/* Capital Statement preview table — a multi-column breakdown (one column per holder, or
+   per line item), so it needs an actual <table> unlike the other statements' two-column
+   CY/PY rows, but it's still a printed statement: no grid lines, header shading or row
+   hover, just the same thin/double/bold rules and font weights as .wb-preview-row above.
+   Never wraps a column's text to fit the fixed 600px panel — the table runs wider than
+   the panel and scrolls sideways instead (the overflow-x: auto on .wb-preview-inner is
+   what makes that scrollbar appear). */
+.workbook-shell .wb-preview-table { width: 100%; border-collapse: collapse; }
+.workbook-shell .wb-preview-table th,
+.workbook-shell .wb-preview-table td { text-align: left; padding: 3px 12px 3px 0; white-space: nowrap; }
+.workbook-shell .wb-preview-table th:last-child,
+.workbook-shell .wb-preview-table td:last-child { padding-right: 0; }
+.workbook-shell .wb-preview-table thead th {
+  /* index.css has a global `th { font-weight: 600 !important; font-size: ... !important }`
+     (predating this preview table) that would otherwise flatten these headers back to the
+     app's generic data-grid weight/size instead of the bold, body-size printed-statement
+     look every other preview's own header uses. */
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  border-bottom: 3px double var(--wb-text);
+  padding-bottom: 6px;
+}
+.workbook-shell .wb-preview-table td.wb-num,
+.workbook-shell .wb-preview-table th.wb-num { text-align: right; font-variant-numeric: tabular-nums; }
+.workbook-shell .wb-preview-table .wb-preview-total-row td { font-weight: 700; border-top: 1px solid var(--wb-text); padding-top: 5px; }
 
 /* ---- CARDS (allocation table, notes, schedule editor) ---- */
 .workbook-shell .wb-card {

@@ -17,7 +17,6 @@ import {
  FolderOpen,
  Check,
  X,
- PanelLeft,
  PanelRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -117,8 +116,9 @@ const MONTH_FULL: Record<string, string> = {
  Jul: "July", Aug: "August", Sep: "September", Oct: "October", Nov: "November", Dec: "December",
 };
 // "Dec 31, 2023" -> { monthDay: "December 31", year: "2023" } — the printed statement's date
-// columns spell the month out and stack the year on its own line, unlike the app's own
-// abbreviated "Dec 31, 2023" strings used everywhere else (title blocks, filters, etc).
+// columns spell the month out and stack the year on its own line. The main panel's title-block
+// subtitle (see `fullDate` below) spells it out too, matching production; engagement filters and
+// the app header keep the app's own abbreviated "Dec 31, 2023" strings.
 function splitStatementDate(yearEnd: string): { monthDay: string; year: string } {
  const m = yearEnd.match(/^(\w{3})\w*\s+(\d{1,2}),\s*(\d{4})$/);
  if (!m) return { monthDay: yearEnd, year: "" };
@@ -131,6 +131,12 @@ function priorStatementDate(yearEnd: string): { monthDay: string; year: string }
  const { monthDay, year } = splitStatementDate(yearEnd);
  const y = Number(year);
  return { monthDay, year: Number.isNaN(y) ? "" : String(y - 1) };
+}
+// "Dec 31, 2023" -> "December 31, 2023" — the main panel's own title-block subtitle (e.g. "As at
+// December 31, 2023") spells the month out, matching production exactly.
+function fullDate(yearEnd: string): string {
+ const { monthDay, year } = splitStatementDate(yearEnd);
+ return year ? `${monthDay}, ${year}` : monthDay;
 }
 
 // ── Schedules (foundation: a schedule is just an LS code pinned to a named page) ──────────
@@ -323,7 +329,7 @@ function BalanceSheetPreview({ bs, client, yearEnd, scheduleByGroupId }: {
  return sch ? `${l.label} (${sch.name.replace(/^Schedule (\d+).*/, "Schedule $1")})` : l.label;
  };
  const row = (l: StatementLine) => (
- <div key={l.id} className="wb-preview-row wb-indent" style={{ fontStyle: "italic" }}>
+ <div key={l.id} className="wb-preview-row wb-indent">
  <span>{lineLabel(l)}</span>
  <span className="wb-amt" style={{ display: "flex", gap: 24 }}>
  <span className="wb-amt-cy" style={{ width: 80, textAlign: "right" }}>{formatAmt(l.cy)}</span>
@@ -414,7 +420,7 @@ function IncomeStatementCentre({ is, expandedLines, toggleLine, onAddSchedule, s
 
 function IncomeStatementPreview({ is, client, yearEnd }: { is: IncomeStatementData; client: string; yearEnd: string }) {
  const row = (l: StatementLine) => (
- <div key={l.id} className="wb-preview-row wb-indent" style={{ fontStyle: "italic" }}>
+ <div key={l.id} className="wb-preview-row wb-indent">
  <span>{l.label}</span>
  <span className="wb-amt" style={{ display: "flex", gap: 24 }}>
  <span className="wb-amt-cy" style={{ width: 80, textAlign: "right" }}>{formatAmt(l.cy)}</span>
@@ -688,7 +694,7 @@ function CashFlowCentre({ cashFlow, overrides, onChangeCategory }: {
 
 function CashFlowPreview({ cf, client, yearEnd }: { cf: CashFlowData; client: string; yearEnd: string }) {
  const line = (label: string, cy: number) => (
- <div key={label} className="wb-preview-row wb-indent" style={{ fontStyle: "italic" }}>
+ <div key={label} className="wb-preview-row wb-indent">
  <span>{label}</span>
  <span className="wb-amt-cy" style={{ width: 80, textAlign: "right" }}>{formatAmt(cy)}</span>
  </div>
@@ -979,7 +985,7 @@ function capitalEntities(data: CapitalStatementData, detail: CapDetail): CapEnti
 // so opening the preview never looks like a different document from what you were just editing.
 function CapitalStatementHeader({ client, title, yearEnd }: { client: string; title: string; yearEnd: string }) {
  return (
- <div className="wb-statement-header" style={{ fontFamily: "var(--wb-font-preview)" }}>
+ <div className="wb-statement-header">
  <h2>{client}</h2>
  <h3>{title}</h3>
  <p>For the year ended {yearEnd}</p>
@@ -1054,16 +1060,15 @@ function CapitalStatementPreview({ data, labels, client, yearEnd, layout, detail
 
  return (
  <div data-tour="wb-capital-preview">
- <div style={{ marginBottom: 24 }}>
  <CapitalStatementHeader client={client} title={labels.statementTitle} yearEnd={yearEnd} />
- </div>
+ <div className="wb-preview-rule" />
  {layout === "horizontal" ? (
  <div style={{ overflowX: "auto" }}>
- <table className="wb-data-table" style={{ fontSize: 13 }}>
+ <table className="wb-preview-table">
  <thead>
  <tr>
  <th></th>
- {ents.map(e => <th key={e.name} className="wb-num" style={{ whiteSpace: "nowrap" }}>{e.name}</th>)}
+ {ents.map(e => <th key={e.name} className="wb-num">{e.name}</th>)}
  <th className="wb-num">Total</th>
  </tr>
  </thead>
@@ -1071,18 +1076,18 @@ function CapitalStatementPreview({ data, labels, client, yearEnd, layout, detail
  <tr className="wb-preview-year-row"><td colSpan={ents.length + 2}>{cyYear}</td></tr>
  {rowKeys.map(k => (
  <tr key={k}>
- <td style={{ fontStyle: "italic" }}>{rowLabel(k)}</td>
+ <td>{rowLabel(k)}</td>
  {ents.map(e => <td key={e.name} className="wb-num wb-amt-cy">{formatAmt(rowVal(e, k))}</td>)}
  <td className="wb-num wb-amt-cy">{formatAmt(rowVal(data.totals, k))}</td>
  </tr>
  ))}
- <tr className="wb-total-row">
+ <tr className="wb-preview-total-row">
  <td>{cyLabel}</td>
  {ents.map(e => <td key={e.name} className="wb-num wb-amt-cy">{formatAmt(e.closing)}</td>)}
  <td className="wb-num wb-amt-cy">{formatAmt(data.totals.closing)}</td>
  </tr>
  <tr className="wb-preview-year-row"><td colSpan={ents.length + 2}>{pyYear}</td></tr>
- <tr className="wb-total-row">
+ <tr className="wb-preview-total-row">
  <td>{pyLabel}</td>
  {ents.map(e => <td key={e.name} className="wb-num wb-amt-py">—</td>)}
  <td className="wb-num wb-amt-py">{formatAmt(data.totalsPy.closing)}</td>
@@ -1091,7 +1096,7 @@ function CapitalStatementPreview({ data, labels, client, yearEnd, layout, detail
  </table>
  </div>
  ) : (
- <table className="wb-data-table" style={{ fontSize: 13 }}>
+ <table className="wb-preview-table">
  <thead>
  <tr>
  <th></th>
@@ -1106,7 +1111,7 @@ function CapitalStatementPreview({ data, labels, client, yearEnd, layout, detail
  <tr className="wb-preview-year-row"><td colSpan={5}>{cyYear}</td></tr>
  {ents.map(e => (
  <tr key={e.name}>
- <td style={{ fontStyle: "italic" }}>{e.name}</td>
+ <td>{e.name}</td>
  <td className="wb-num wb-amt-cy">{formatAmt(e.opening)}</td>
  <td className="wb-num wb-amt-cy">{formatAmt(e.contributions)}</td>
  <td className="wb-num wb-amt-cy">{formatAmt(e.ni)}</td>
@@ -1114,7 +1119,7 @@ function CapitalStatementPreview({ data, labels, client, yearEnd, layout, detail
  <td className="wb-num wb-amt-cy">{formatAmt(e.closing)}</td>
  </tr>
  ))}
- <tr className="wb-total-row">
+ <tr className="wb-preview-total-row">
  <td>{cyLabel}</td>
  <td className="wb-num wb-amt-cy">{formatAmt(data.totals.opening)}</td>
  <td className="wb-num wb-amt-cy">{formatAmt(data.totals.contributions)}</td>
@@ -1123,7 +1128,7 @@ function CapitalStatementPreview({ data, labels, client, yearEnd, layout, detail
  <td className="wb-num wb-amt-cy">{formatAmt(data.totals.closing)}</td>
  </tr>
  <tr className="wb-preview-year-row"><td colSpan={5}>{pyYear}</td></tr>
- <tr className="wb-total-row">
+ <tr className="wb-preview-total-row">
  <td>{pyLabel}</td>
  <td className="wb-num wb-amt-py">{formatAmt(data.totalsPy.opening)}</td>
  <td className="wb-num wb-amt-py">{formatAmt(data.totalsPy.contributions)}</td>
@@ -1313,7 +1318,6 @@ export default function Workbook() {
  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
  const [expandedLines, setExpandedLines] = useState<Set<string>>(new Set());
  const [search, setSearch] = useState("");
- const [sidebarOpen, setSidebarOpen] = useState(true);
  const [schedules, setSchedules] = useState<ScheduleDef[]>(() => loadSchedules(engId));
 
  // Force light theme on this page for consistent white workbook experience. A MutationObserver
@@ -1435,9 +1439,9 @@ export default function Workbook() {
  // A point-in-time statement reads "As at", a period statement "For the year ended" —
  // a schedule is neither, so it just shows the date on its own.
  const titleSubtitle =
- activeSchedule ? engagement.yearEnd :
- (active === "tb-grouping" || active === "balance-sheet") ? `As at ${engagement.yearEnd}` :
- `For the year ended ${engagement.yearEnd}`;
+ activeSchedule ? fullDate(engagement.yearEnd) :
+ (active === "tb-grouping" || active === "balance-sheet") ? `As at ${fullDate(engagement.yearEnd)}` :
+ `For the year ended ${fullDate(engagement.yearEnd)}`;
 
  const showPreview = active === "balance-sheet" || active === "income" || active === "capital-statement" || active === "cash-flows" || !!activeSchedule;
 
@@ -1467,9 +1471,8 @@ export default function Workbook() {
 
  {/* Three-panel body */}
  <div className="wb-app-main min-h-0">
- {/* LHS nav panel — fully hidden (no band) while closed; opened/closed solely via
- the menu icon in the main toolbar. */}
- {sidebarOpen && (
+ {/* LHS nav panel — always visible, matching production's page-title-block exactly:
+ it has no menu-toggle icon, just "Collapse All" and "Refresh". */}
  <aside className="wb-panel wb-lhs-panel">
  <nav className="wb-lhs-inner">
  <button
@@ -1502,7 +1505,6 @@ export default function Workbook() {
  ))}
  </nav>
  </aside>
- )}
 
  {/* Main panel */}
  <section className="wb-panel wb-main-panel">
@@ -1511,24 +1513,15 @@ export default function Workbook() {
  (icons + title live together, not a separate toolbar strip above the title). */}
  <div className="wb-title-block">
  <div className="wb-title-block-left">
- <button
- onClick={() => setSidebarOpen(v => !v)}
- className="wb-icon-btn"
- aria-label={sidebarOpen ? "Close menu" : "Open menu"}
- title={sidebarOpen ? "Close menu" : "Open menu"}
- >
- <PanelLeft className="h-4 w-4" />
- </button>
- <button className="wb-icon-btn">
+ <button className="wb-icon-btn" aria-label="Collapse All" title="Collapse All">
  <Minimize2 className="h-4 w-4" />
  </button>
- <button className="wb-icon-btn wb-subtle">
+ <button className="wb-icon-btn" aria-label="Refresh" title="Refresh">
  <RefreshCw className="h-4 w-4" />
  </button>
  </div>
  <div className="wb-title-block-center">
  <div className="wb-view-title">
- <div className="wb-view-entity">{engagement.client}</div>
  {activeSchedule ? (
  <div className="wb-subtitle">{titleSubtitle}</div>
  ) : (
@@ -1749,12 +1742,13 @@ export default function Workbook() {
 
  {/* RHS preview — an absolutely-positioned overlay that floats on top of the main
  panel's right edge, including its toolbar (matching production exactly) rather
- than a layout sibling, so opening/closing it never resizes the main panel. Not
- rendered at all while collapsed, so there's no band. Because it floats above the
- main toolbar, its own toggle button there is covered once open, so the preview
- carries its own close button too. */}
- {showPreview && !previewCollapsed && (active === "balance-sheet" || active === "income" || active === "capital-statement" || active === "cash-flows") && (
- <aside className="wb-panel wb-preview-panel">
+ than a layout sibling, so opening/closing it never resizes the main panel. Stays
+ mounted (just translated off-screen) while collapsed, so toggling it slides it in
+ and out like production's own mat-drawer instead of snapping in and out of
+ existence. Because it floats above the main toolbar, its own toggle button there
+ is covered once open, so the preview carries its own close button too. */}
+ {showPreview && (active === "balance-sheet" || active === "income" || active === "capital-statement" || active === "cash-flows") && (
+ <aside className={cn("wb-panel wb-preview-panel", previewCollapsed && "wb-preview-panel-collapsed")}>
  <div className="wb-preview-inner">
  <button
  type="button"
@@ -1766,16 +1760,16 @@ export default function Workbook() {
  <X className="h-4 w-4" />
  </button>
  {active === "balance-sheet" && (
- <BalanceSheetPreview bs={balanceSheet} client={engagement.client} yearEnd={engagement.yearEnd} scheduleByGroupId={scheduleByGroupId} />
+ <BalanceSheetPreview bs={balanceSheet} client={engagement.client} yearEnd={fullDate(engagement.yearEnd)} scheduleByGroupId={scheduleByGroupId} />
  )}
  {active === "income" && (
- <IncomeStatementPreview is={incomeStatement} client={engagement.client} yearEnd={engagement.yearEnd} />
+ <IncomeStatementPreview is={incomeStatement} client={engagement.client} yearEnd={fullDate(engagement.yearEnd)} />
  )}
  {active === "capital-statement" && capitalStatement && labels && (
- <CapitalStatementPreview data={capitalStatement} labels={labels} client={engagement.client} yearEnd={engagement.yearEnd} layout={capLayout} detail={capDetail} />
+ <CapitalStatementPreview data={capitalStatement} labels={labels} client={engagement.client} yearEnd={fullDate(engagement.yearEnd)} layout={capLayout} detail={capDetail} />
  )}
  {active === "cash-flows" && (
- <CashFlowPreview cf={cashFlow} client={engagement.client} yearEnd={engagement.yearEnd} />
+ <CashFlowPreview cf={cashFlow} client={engagement.client} yearEnd={fullDate(engagement.yearEnd)} />
  )}
  </div>
  </aside>
