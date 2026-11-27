@@ -1054,20 +1054,10 @@ function CapControlDropdown({ label, value, options, onChange }: { label: string
  );
 }
 
-function CapitalStatementPreview({ data, labels, client, yearEnd, individualDisabled }: {
+function CapitalStatementPreview({ data, labels, client, yearEnd, layout, detail }: {
  data: CapitalStatementData; labels: EntityLabels; client: string; yearEnd: string;
- // Same "too many partners to show individually, or capital visibility is restricted" gate the
- // centre panel's own Show dropdown uses — computed once by the parent from data it already has
- // (participant count, engagement.capitalVisibility), so the two controls agree on when
- // "Each partner" is actually offerable, even though their selected VALUES are independent.
- individualDisabled: boolean;
+ layout: CapLayout; detail: CapDetail;
 }) {
- // The preview's own Layout/Show — independent from the centre panel's identical controls (see
- // their own comment at the capLayout/capDetail declaration): changing the view here never
- // changes what the centre's "Allocation by partner" grid shows, and vice versa. Same defaults
- // as the centre for the same reason (individual partner info visible with no toggling needed).
- const [layout, setLayout] = useState<CapLayout>("horizontal");
- const [detail, setDetail] = useState<CapDetail>(individualDisabled ? "class" : "individual");
  const hasAdj = Math.abs(data.totals.adjustments) > 0.005;
  const ents = capitalEntities(data, detail);
  // Real per-participant prior-year rows (detail === "individual" only — see
@@ -1104,24 +1094,6 @@ function CapitalStatementPreview({ data, labels, client, yearEnd, individualDisa
  <div data-tour="wb-capital-preview">
  <CapitalStatementHeader client={client} title={labels.statementTitle} yearEnd={yearEnd} />
  <div className="wb-preview-rule" />
- <div style={{ display: "flex", gap: 12, padding: "0 0 12px" }} data-tour="wb-capital-preview-controls">
- <CapControlDropdown
- label="Layout"
- value={layout}
- options={[{ value: "vertical", label: `${labels.holder}s down` }, { value: "horizontal", label: `${labels.holder}s across` }]}
- onChange={v => setLayout(v as CapLayout)}
- />
- <CapControlDropdown
- label="Show"
- value={detail}
- options={[
- { value: "individual", label: `Each ${labels.holder.toLowerCase()}`, disabled: individualDisabled },
- { value: "class", label: data.classTotals.length > 1 ? "General / limited" : `All ${labels.holders.toLowerCase()}` },
- { value: "total", label: "Totals only" },
- ]}
- onChange={v => setDetail(v as CapDetail)}
- />
- </div>
  {layout === "horizontal" ? (
  <div style={{ overflowX: "auto" }}>
  <table className="wb-preview-table">
@@ -1537,14 +1509,14 @@ export default function Workbook() {
  () => (isPartnershipOrTrust ? buildCapitalStatement(engId, engagement.entityType as EntityKind, participants, pwWorksheet, engagement.trustVariant, incomeStatement.netIncomePy) : null),
  [engId, isPartnershipOrTrust, engagement.entityType, engagement.trustVariant, participants, pwWorksheet, incomeStatement.netIncomePy]
  );
- // Layout/Show here control the CENTRE panel's own "Allocation by partner" grid only — the
- // preview has its own independent copy of these same controls (inside CapitalStatementPreview
- // itself) so changing one view doesn't change the other. Both default to "horizontal"/
- // "individual" (partners across, each shown on their own) so individual partner information is
- // visible without the preparer needing to toggle anything, in either place.
- const individualDisabled = (capitalStatement?.rows.length ?? 0) > 12 || engagement.capitalVisibility !== "open";
+ // Layout/Show now live in the centre panel (not the preview) and control what the preview
+ // renders when expanded — the preview itself is left settings-free, matching the centre area.
+ // Defaults to "horizontal" (partners across, like columns on a real client statement) so the
+ // preview shows individual partner information without the preparer needing to toggle it.
  const [capLayout, setCapLayout] = useState<CapLayout>("horizontal");
- const [capDetail, setCapDetail] = useState<CapDetail>(() => (individualDisabled ? "class" : "individual"));
+ const [capDetail, setCapDetail] = useState<CapDetail>(() =>
+ ((capitalStatement?.rows.length ?? 0) > 12 || engagement.capitalVisibility !== "open") ? "class" : "individual"
+ );
  // Minimised by default for every statement's preview (Balance Sheet, Income, Capital
  // Statement) — a thin trigger tab on the right slides it open on click, same control
  // regardless of which statement is active.
@@ -1756,7 +1728,7 @@ export default function Workbook() {
  label="Show"
  value={capDetail}
  options={[
- { value: "individual", label: `Each ${labels.holder.toLowerCase()}`, disabled: individualDisabled },
+ { value: "individual", label: `Each ${labels.holder.toLowerCase()}`, disabled: capitalStatement.rows.length > 12 || engagement.capitalVisibility !== "open" },
  { value: "class", label: capitalStatement.classTotals.length > 1 ? "General / limited" : `All ${labels.holders.toLowerCase()}` },
  { value: "total", label: "Totals only" },
  ]}
@@ -1933,7 +1905,7 @@ export default function Workbook() {
  <IncomeStatementPreview is={incomeStatement} client={engagement.client} yearEnd={fullDate(engagement.yearEnd)} isPartnershipOrTrust={isPartnershipOrTrust} />
  )}
  {active === "capital-statement" && capitalStatement && labels && (
- <CapitalStatementPreview data={capitalStatement} labels={labels} client={engagement.client} yearEnd={fullDate(engagement.yearEnd)} individualDisabled={individualDisabled} />
+ <CapitalStatementPreview data={capitalStatement} labels={labels} client={engagement.client} yearEnd={fullDate(engagement.yearEnd)} layout={capLayout} detail={capDetail} />
  )}
  {active === "cash-flows" && (
  <CashFlowPreview cf={cashFlow} client={engagement.client} yearEnd={fullDate(engagement.yearEnd)} />
